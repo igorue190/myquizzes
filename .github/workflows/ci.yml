@@ -1,0 +1,74 @@
+name: CI
+
+# Builds and tests Markwise on every push/PR. The pure packages run as fast
+# `swift test`; the iOS packages + app build/test against an iOS Simulator.
+#
+# Requirements: an Xcode 26+ runner image (for the iOS 26 SDK). Adjust the
+# simulator device name below if the runner doesn't have "iPhone 16".
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  pure-packages:
+    name: Pure packages (swift test)
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable   # must resolve to Xcode 26+
+      - name: Versions
+        run: swift --version && xcodebuild -version
+      - name: Test pure packages
+        run: |
+          set -euo pipefail
+          for pkg in CoreModels MarkdownParser QuizEngine Statistics Persistence; do
+            echo "::group::$pkg"
+            swift test --package-path "Packages/$pkg"
+            echo "::endgroup::"
+          done
+      - name: Build CLI demo
+        run: swift build
+      - name: Run CLI demo
+        run: swift run myquizzes Samples/AZ-900.md
+
+  ios:
+    name: iOS packages + app
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
+      - name: iOS package tests (Simulator)
+        env:
+          DEST: platform=iOS Simulator,name=iPhone 16
+        run: |
+          set -euo pipefail
+          for pkg in DesignSystem QuizFeature LibraryFeature StatsFeature ProfileFeature; do
+            echo "::group::$pkg tests"
+            ( cd "Packages/$pkg" && xcodebuild test -scheme "$pkg" -destination "$DEST" )
+            echo "::endgroup::"
+          done
+      - name: iOS package builds
+        env:
+          DEST: generic/platform=iOS Simulator
+        run: |
+          set -euo pipefail
+          for pkg in ImportFeature ResultsFeature AppFeature; do
+            echo "::group::$pkg build"
+            ( cd "Packages/$pkg" && xcodebuild build -scheme "$pkg" -destination "$DEST" )
+            echo "::endgroup::"
+          done
+      - name: App build
+        run: |
+          xcodebuild -project Markwise.xcodeproj -scheme Markwise \
+            -destination 'generic/platform=iOS Simulator' \
+            CODE_SIGNING_ALLOWED=NO build

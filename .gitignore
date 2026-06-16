@@ -1,0 +1,13 @@
+.DS_Store
+# Ignore SwiftPM build dirs at the repo root *and* inside each local package
+# (Packages/*/.build). A leading-slash `/.build` would only match the root,
+# letting Packages/*/.build artifacts get committed.
+.build/
+# NOTE: `Packages/` here holds our own local source packages (CoreModels,
+# MarkdownParser, QuizEngine, …) and is intentionally tracked — only their
+# nested .build/ output is ignored by the rule above.
+xcuserdata/
+DerivedData/
+.swiftpm/configuration/registries.json
+.swiftpm/xcode/package.xcworkspace/contents.xcworkspacedata
+.netrc
