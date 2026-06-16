@@ -1,0 +1,30 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(swift --version)",
+      "Bash(xcodebuild -version)",
+      "Bash(swift test *)",
+      "Bash(swift build *)",
+      "Read(//Library/Developer/CommandLineTools/usr/lib/swift/pm/ManifestAPI/**)",
+      "Bash(nm -gU /Library/Developer/CommandLineTools/usr/lib/swift/pm/ManifestAPI/libPackageDescription.dylib)",
+      "Read(//Library/Developer/CommandLineTools/usr/lib/swift/pm/**)",
+      "Bash(xcrun swift-demangle *)",
+      "Bash(swiftc /tmp/min.swift -o /tmp/min)",
+      "Bash(/tmp/min)",
+      "Bash(echo \"exit=$?\")",
+      "Read(//Library/Developer/CommandLineTools/usr/include/swift/**)",
+      "Bash(xcrun --show-sdk-path)",
+      "Bash(pkgutil --pkg-info=com.apple.pkg.CLTools_Executables)",
+      "Bash(sudo -n true)",
+      "Bash(git ls-remote *)",
+      "Bash(xcode-select -p)",
+      "Read(//Applications/**)",
+      "Bash(DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer swift --version)",
+      "Bash(DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer xcodebuild -showsdks)",
+      "Read(//Users/igornesterenko/Applications/**)",
+      "Bash(mdfind \"kMDItemCFBundleIdentifier == 'com.apple.dt.Xcode'\")",
+      "Read(//Users/igornesterenko/Downloads/**)",
+      "Bash(xcodebuild -showsdks)"
+    ]
+  }
+}
