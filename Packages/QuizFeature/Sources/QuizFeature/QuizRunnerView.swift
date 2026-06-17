@@ -101,9 +101,10 @@ public struct QuizRunnerView: View {
     @ViewBuilder
     private var navigationBar: some View {
         HStack(spacing: Spacing.md) {
-            Button("Back") { model.goToPrevious() }
-                .buttonStyle(.glassSecondary)
-                .disabled(model.isFirst)
+            if !model.isFirst {
+                Button("Back") { model.goToPrevious() }
+                    .buttonStyle(.glassSecondary)
+            }
 
             if model.isLast {
                 Button("Submit") { model.submit() }

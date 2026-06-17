@@ -3,9 +3,9 @@
 //  ResultsFeature
 //
 //  A score report for one finished session: the pass/fail ring, the details
-//  (when, what, mode), and the per-topic breakdown. Used as the History detail.
-//  (The just-finished per-question review lives in QuizFeature, which still has
-//  the live questions.)
+//  (when, what, mode), the per-topic breakdown, and — for sessions saved with
+//  answer snapshots — a full per-question review (prompt, every option marked
+//  correct/incorrect/chosen, and the explanation). Used as the History detail.
 //
 
 import SwiftUI
@@ -41,6 +41,10 @@ public struct SessionSummaryView: View {
 
                 if !result.topicBreakdown.isEmpty {
                     breakdownCard
+                }
+
+                if !reviewableAttempts.isEmpty {
+                    reviewSection
                 }
             }
             .padding(Spacing.lg)
@@ -85,6 +89,60 @@ public struct SessionSummaryView: View {
             Text(label).font(Typography.callout).foregroundStyle(.secondary)
             Spacer()
             Text(value).font(Typography.callout.weight(.medium))
+        }
+    }
+
+    // MARK: - Per-question review
+
+    /// Attempts that carry an answer snapshot (older sessions have none).
+    private var reviewableAttempts: [QuestionAttempt] {
+        result.attempts.filter { !$0.choices.isEmpty }
+    }
+
+    private var reviewSection: some View {
+        VStack(alignment: .leading, spacing: Spacing.lg) {
+            Label("Review", systemImage: "list.bullet.rectangle")
+                .font(Typography.headline)
+                .padding(.horizontal, Spacing.xs)
+
+            ForEach(reviewableAttempts) { attempt in
+                QuestionCard(
+                    prompt: attempt.prompt ?? "Question",
+                    badge: TagChip(
+                        attempt.isCorrect ? "Correct" : "Incorrect",
+                        kind: .semantic(attempt.isCorrect ? ColorTokens.success : ColorTokens.danger)
+                    )
+                ) {
+                    ForEach(attempt.choices) { choice in
+                        ChoiceRow(
+                            label: choice.text,
+                            state: state(of: choice, in: attempt),
+                            style: style(for: attempt),
+                            isEnabled: false
+                        ) {}
+                    }
+                    if let explanation = attempt.explanation, !explanation.isEmpty {
+                        MarkdownText(explanation)
+                            .font(Typography.callout)
+                            .foregroundStyle(.secondary)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                }
+            }
+        }
+    }
+
+    private func style(for attempt: QuestionAttempt) -> ChoiceSelectionStyle {
+        attempt.choices.filter(\.isCorrect).count > 1 ? .multiple : .single
+    }
+
+    private func state(of choice: AttemptChoice, in attempt: QuestionAttempt) -> ChoiceState {
+        let selected = attempt.selectedChoiceIDs.contains(choice.id)
+        switch (choice.isCorrect, selected) {
+        case (true, true):   return .correct
+        case (true, false):  return .missedCorrect
+        case (false, true):  return .incorrect
+        case (false, false): return .unselected
         }
     }
 }

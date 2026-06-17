@@ -73,11 +73,14 @@ public enum ColorTokens {
         )
     }
 
-    // Semantic state colors — used *only* when they carry meaning.
-    public static let success = Color(light: 0x15803D, dark: 0x4ADE80)
-    public static let warning = Color(light: 0xB45309, dark: 0xFBBF24)
-    public static let danger  = Color(light: 0xB91C1C, dark: 0xF87171)
-    public static let info    = Color(light: 0x1D4ED8, dark: 0x60A5FA)
+    // Semantic state colors — used *only* when they carry meaning. Tuned so the
+    // light values clear WCAG AA (≥4.5:1) as text on the light surface and the
+    // dark values do the same on the dark surface, while toning down the neon
+    // green/yellow that read poorly over translucent glass.
+    public static let success = Color(light: 0x0F7A34, dark: 0x52D17E)
+    public static let warning = Color(light: 0x8A5300, dark: 0xE2A92B)
+    public static let danger  = Color(light: 0xC02626, dark: 0xF1736F)
+    public static let info    = Color(light: 0x1A4FD0, dark: 0x6BA6FA)
 
     // Surfaces & lines
     /// Opaque surface used as the fallback when Reduce Transparency is on.

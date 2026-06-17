@@ -26,6 +26,9 @@ public final class LibraryViewModel {
     private let repository: any LibraryRepository
 
     public private(set) var nodes: [CategoryNode] = []
+    /// A flat list of every stored file, refreshed on `load()`. The Practice tab
+    /// observes this so imported quizzes are runnable without browsing the tree.
+    public private(set) var files: [QuizFileRef] = []
     public private(set) var isLoading = false
     public var errorMessage: String?
 
@@ -46,6 +49,7 @@ public final class LibraryViewModel {
                 result.append(CategoryNode(category: category, topics: topics))
             }
             nodes = result
+            files = (try? await repository.allFiles()) ?? []
         } catch {
             errorMessage = "Couldn't load your library."
         }
@@ -53,6 +57,42 @@ public final class LibraryViewModel {
 
     public func markdown(for file: QuizFileRef) async -> String? {
         try? await repository.markdown(for: file.id)
+    }
+
+    /// Reconstruct real questions (with their choices) for a list of prompts —
+    /// the bridge that lets "Review weak areas" re-quiz from history, since
+    /// history only records prompts, not answer options. Parses every stored
+    /// file, matches by trimmed prompt in the given priority order, caps at
+    /// `limit`, and renumbers ids so the combined pool forms a valid session.
+    public func reviewQuestions(forPrompts prompts: [String], limit: Int) async -> [Question] {
+        guard limit > 0, !prompts.isEmpty else { return [] }
+
+        var byPrompt: [String: Question] = [:]
+        for file in files {
+            guard let markdown = try? await repository.markdown(for: file.id) else { continue }
+            for question in MarkdownQuizParser().parse(markdown).usableQuestions {
+                let key = question.prompt.trimmingCharacters(in: .whitespacesAndNewlines)
+                if byPrompt[key] == nil { byPrompt[key] = question }
+            }
+        }
+
+        var pool: [Question] = []
+        var used = Set<String>()
+        for prompt in prompts {
+            let key = prompt.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !used.contains(key), let question = byPrompt[key] else { continue }
+            used.insert(key)
+            pool.append(question)
+            if pool.count >= limit { break }
+        }
+
+        return pool.enumerated().map { index, q in
+            Question(
+                id: index, prompt: q.prompt, type: q.type, choices: q.choices,
+                explanation: q.explanation, reference: q.reference, tags: q.tags,
+                difficulty: q.difficulty
+            )
+        }
     }
 
     // MARK: - Container queries (a "container" is a topic root or a folder)

@@ -35,6 +35,54 @@ struct StatisticsTests {
         #expect(overview.overallAccuracy == 0)
     }
 
+    // MARK: - Review scheduling
+
+    /// A one-question session: `prompt` answered `correct` at `daysAgo`.
+    private func attemptRecord(_ prompt: String, correct: Bool, daysAgo: Int) -> SessionRecord {
+        let attempt = QuestionAttempt(
+            questionID: 0, selectedChoiceIDs: [correct ? 0 : 1],
+            correctChoiceIDs: [0], isCorrect: correct, prompt: prompt
+        )
+        return SessionRecord(
+            finishedAt: Date(timeIntervalSinceNow: TimeInterval(-daysAgo * 86_400)),
+            result: SessionResult(mode: .training, attempts: [attempt], passThreshold: 70)
+        )
+    }
+
+    @Test("A never-missed question is not due for review")
+    func reviewSkipsCorrect() {
+        let due = Statistics.dueForReview(from: [attemptRecord("Q1", correct: true, daysAgo: 1)])
+        #expect(due.isEmpty)
+    }
+
+    @Test("A missed question becomes due, and graduates after two correct in a row")
+    func reviewGraduation() {
+        let learned = [
+            attemptRecord("Q1", correct: false, daysAgo: 3),
+            attemptRecord("Q1", correct: true, daysAgo: 2),
+            attemptRecord("Q1", correct: true, daysAgo: 1)
+        ]
+        #expect(Statistics.dueForReview(from: learned).isEmpty)
+
+        let stillWeak = [
+            attemptRecord("Q1", correct: false, daysAgo: 2),
+            attemptRecord("Q1", correct: true, daysAgo: 1)
+        ]
+        #expect(Statistics.dueForReview(from: stillWeak) == ["Q1"])
+    }
+
+    @Test("A just-missed question outranks an older miss")
+    func reviewPriorityOrder() {
+        let records = [
+            attemptRecord("Older", correct: false, daysAgo: 5),
+            attemptRecord("Older", correct: true, daysAgo: 4),
+            attemptRecord("Recent", correct: false, daysAgo: 1)
+        ]
+        let due = Statistics.dueForReview(from: records)
+        #expect(due.first == "Recent")
+        #expect(Set(due) == ["Recent", "Older"])
+    }
+
     @Test("Topic accuracy is summed across sessions, weakest first")
     func topicAggregation() {
         let records = [

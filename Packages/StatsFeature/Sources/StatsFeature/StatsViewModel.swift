@@ -25,4 +25,11 @@ public final class StatsViewModel {
         let records = (try? await repository.allRecords()) ?? []
         overview = Statistics.overview(from: records)
     }
+
+    /// Wipe all saved sessions, then reload (the view falls back to its empty
+    /// state). Shares the session store with History, so this clears both.
+    public func clear() async {
+        try? await repository.deleteAll()
+        await load()
+    }
 }

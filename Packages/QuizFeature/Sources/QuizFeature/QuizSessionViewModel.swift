@@ -55,6 +55,17 @@ public final class QuizSessionViewModel {
         return QuizSessionViewModel(session: session)
     }
 
+    /// Build a session from an explicit set of questions — used by the "Review
+    /// weak areas" flow, which assembles its pool from across the whole Library.
+    /// Callers should hand in questions with unique ids.
+    public static func make(
+        fromQuestions questions: [Question],
+        config: SessionConfig
+    ) -> QuizSessionViewModel {
+        let session = SessionPlanner.makeSession(from: questions, config: config)
+        return QuizSessionViewModel(session: session)
+    }
+
     // MARK: - Intents
 
     public func select(_ choiceID: Int, in questionID: Int) {

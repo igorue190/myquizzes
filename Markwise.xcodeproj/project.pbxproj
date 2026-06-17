@@ -3,17 +3,48 @@
 	archiveVersion = 1;
 	classes = {
 	};
-	objectVersion = 56;
+	objectVersion = 60;
 	objects = {
 
 /* Begin PBXBuildFile section */
 		A00000080000000000000000 /* MarkwiseApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000070000000000000000 /* MarkwiseApp.swift */; };
 		A00000090000000000000000 /* AppFeature in Frameworks */ = {isa = PBXBuildFile; productRef = A00000140000000000000000 /* AppFeature */; };
+		A00000250000000000000000 /* ShareViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000210000000000000000 /* ShareViewController.swift */; };
+		A00000260000000000000000 /* ShareExtension.appex in Embed App Extensions */ = {isa = PBXBuildFile; fileRef = A00000200000000000000000 /* ShareExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 /* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		A00000300000000000000000 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = A00000010000000000000000 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = A000002C0000000000000000;
+			remoteInfo = ShareExtension;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		A000002B0000000000000000 /* Embed App Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				A00000260000000000000000 /* ShareExtension.appex in Embed App Extensions */,
+			);
+			name = "Embed App Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
 		A00000060000000000000000 /* Markwise.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Markwise.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		A00000070000000000000000 /* MarkwiseApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MarkwiseApp.swift; sourceTree = "<group>"; };
+		A00000200000000000000000 /* ShareExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = ShareExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		A00000210000000000000000 /* ShareViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShareViewController.swift; sourceTree = "<group>"; };
+		A00000220000000000000000 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		A00000230000000000000000 /* ShareExtension.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = ShareExtension.entitlements; sourceTree = "<group>"; };
+		A00000240000000000000000 /* Markwise.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Markwise.entitlements; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -25,6 +56,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		A00000290000000000000000 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -32,6 +70,7 @@
 			isa = PBXGroup;
 			children = (
 				A00000030000000000000000 /* App */,
+				A00000270000000000000000 /* App/ShareExtension */,
 				A00000040000000000000000 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -40,6 +79,7 @@
 			isa = PBXGroup;
 			children = (
 				A00000070000000000000000 /* MarkwiseApp.swift */,
+				A00000240000000000000000 /* Markwise.entitlements */,
 			);
 			path = App;
 			sourceTree = "<group>";
@@ -48,8 +88,19 @@
 			isa = PBXGroup;
 			children = (
 				A00000060000000000000000 /* Markwise.app */,
+				A00000200000000000000000 /* ShareExtension.appex */,
 			);
 			name = Products;
+			sourceTree = "<group>";
+		};
+		A00000270000000000000000 /* App/ShareExtension */ = {
+			isa = PBXGroup;
+			children = (
+				A00000210000000000000000 /* ShareViewController.swift */,
+				A00000220000000000000000 /* Info.plist */,
+				A00000230000000000000000 /* ShareExtension.entitlements */,
+			);
+			path = App/ShareExtension;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -62,10 +113,12 @@
 				A000000A0000000000000000 /* Sources */,
 				A000000B0000000000000000 /* Frameworks */,
 				A000000C0000000000000000 /* Resources */,
+				A000002B0000000000000000 /* Embed App Extensions */,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				A00000310000000000000000 /* PBXTargetDependency */,
 			);
 			name = Markwise;
 			packageProductDependencies = (
@@ -74,6 +127,23 @@
 			productName = Markwise;
 			productReference = A00000060000000000000000 /* Markwise.app */;
 			productType = "com.apple.product-type.application";
+		};
+		A000002C0000000000000000 /* ShareExtension */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = A000002D0000000000000000 /* Build configuration list for PBXNativeTarget "ShareExtension" */;
+			buildPhases = (
+				A00000280000000000000000 /* Sources */,
+				A00000290000000000000000 /* Frameworks */,
+				A000002A0000000000000000 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = ShareExtension;
+			productName = ShareExtension;
+			productReference = A00000200000000000000000 /* ShareExtension.appex */;
+			productType = "com.apple.product-type.app-extension";
 		};
 /* End PBXNativeTarget section */
 
@@ -86,6 +156,9 @@
 				LastUpgradeCheck = 2600;
 				TargetAttributes = {
 					A00000050000000000000000 = {
+						CreatedOnToolsVersion = 26.0;
+					};
+					A000002C0000000000000000 = {
 						CreatedOnToolsVersion = 26.0;
 					};
 				};
@@ -107,12 +180,20 @@
 			projectRoot = "";
 			targets = (
 				A00000050000000000000000 /* Markwise */,
+				A000002C0000000000000000 /* ShareExtension */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
 		A000000C0000000000000000 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		A000002A0000000000000000 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -130,7 +211,23 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		A00000280000000000000000 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A00000250000000000000000 /* ShareViewController.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		A00000310000000000000000 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = A000002C0000000000000000 /* ShareExtension */;
+			targetProxy = A00000300000000000000000 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
 		A000000F0000000000000000 /* Debug */ = {
@@ -169,9 +266,11 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
-				CODE_SIGNING_ALLOWED = NO;
+				CODE_SIGNING_ALLOWED = YES;
+				CODE_SIGN_ENTITLEMENTS = App/Markwise.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = K34AH4FX7F;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
@@ -183,7 +282,7 @@
 					"@executable_path/Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.markwise.app;
+				PRODUCT_BUNDLE_IDENTIFIER = com.ihor.markwise;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.0;
@@ -195,9 +294,11 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
-				CODE_SIGNING_ALLOWED = NO;
+				CODE_SIGNING_ALLOWED = YES;
+				CODE_SIGN_ENTITLEMENTS = App/Markwise.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = K34AH4FX7F;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
@@ -209,9 +310,64 @@
 					"@executable_path/Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.markwise.app;
+				PRODUCT_BUNDLE_IDENTIFIER = com.ihor.markwise;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		A000002E0000000000000000 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				CODE_SIGNING_ALLOWED = YES;
+				CODE_SIGN_ENTITLEMENTS = App/ShareExtension/ShareExtension.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = K34AH4FX7F;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = App/ShareExtension/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.ihor.markwise.ShareExtension;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		A000002F0000000000000000 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				CODE_SIGNING_ALLOWED = YES;
+				CODE_SIGN_ENTITLEMENTS = App/ShareExtension/ShareExtension.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = K34AH4FX7F;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = App/ShareExtension/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.ihor.markwise.ShareExtension;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
 			};
@@ -234,6 +390,15 @@
 			buildConfigurations = (
 				A00000110000000000000000 /* Debug */,
 				A00000120000000000000000 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		A000002D0000000000000000 /* Build configuration list for PBXNativeTarget "ShareExtension" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				A000002E0000000000000000 /* Debug */,
+				A000002F0000000000000000 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

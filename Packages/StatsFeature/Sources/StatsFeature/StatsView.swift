@@ -14,6 +14,7 @@ import DesignSystem
 
 public struct StatsView: View {
     @State private var model: StatsViewModel
+    @State private var showClearConfirm = false
 
     public init(model: StatsViewModel) {
         _model = State(initialValue: model)
@@ -41,6 +42,22 @@ public struct StatsView: View {
                     .padding(Spacing.lg)
                 }
             }
+        }
+        .toolbar {
+            if model.overview.sessionCount > 0 {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button(role: .destructive) { showClearConfirm = true } label: {
+                        Image(systemName: "trash")
+                    }
+                    .tint(ColorTokens.danger)
+                }
+            }
+        }
+        .alert("Clear all stats?", isPresented: $showClearConfirm) {
+            Button("Clear", role: .destructive) { Task { await model.clear() } }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("This deletes every saved session — stats and history. It can't be undone.")
         }
         .task { await model.load() }
     }

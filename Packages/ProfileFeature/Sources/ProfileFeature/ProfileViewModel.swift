@@ -8,6 +8,7 @@
 
 import Foundation
 import Observation
+import UIKit
 import CoreModels
 import DesignSystem
 
@@ -16,12 +17,21 @@ import DesignSystem
 public final class ProfileViewModel {
     private let repository: any ProfileRepository
     private let sessionRepository: any SessionRepository
+    private let libraryRepository: any LibraryRepository
 
     public var profile: Profile = .default
 
-    public init(repository: any ProfileRepository, sessionRepository: any SessionRepository) {
+    /// A short summary of the most recent successful restore, for the result alert.
+    public private(set) var lastRestoreSummary: String?
+
+    public init(
+        repository: any ProfileRepository,
+        sessionRepository: any SessionRepository,
+        libraryRepository: any LibraryRepository
+    ) {
         self.repository = repository
         self.sessionRepository = sessionRepository
+        self.libraryRepository = libraryRepository
     }
 
     /// The DesignSystem theme for the current profile (so the app can re-tint).
@@ -37,6 +47,76 @@ public final class ProfileViewModel {
 
     public func clearHistory() async {
         try? await sessionRepository.deleteAll()
+    }
+
+    /// Store a user-picked photo as the avatar (downscaled so the persisted
+    /// profile stays small). Pass `nil` to clear it and fall back to the symbol.
+    public func setPhoto(_ data: Data?) {
+        guard let data else {
+            profile.avatarImageData = nil
+            return
+        }
+        profile.avatarImageData = Self.downscaledJPEG(from: data) ?? data
+    }
+
+    /// Resize to fit a square box and re-encode as JPEG to bound the stored size.
+    private static func downscaledJPEG(from data: Data, maxDimension: CGFloat = 512) -> Data? {
+        guard let image = UIImage(data: data) else { return nil }
+        let longest = max(image.size.width, image.size.height)
+        let scale = longest > maxDimension ? maxDimension / longest : 1
+        let target = CGSize(width: image.size.width * scale, height: image.size.height * scale)
+        let renderer = UIGraphicsImageRenderer(size: target)
+        let resized = renderer.image { _ in image.draw(in: CGRect(origin: .zero, size: target)) }
+        return resized.jpegData(compressionQuality: 0.8)
+    }
+
+    // MARK: - Backup / Restore
+
+    /// Build a full backup (library + history + profile), write it to a temporary
+    /// JSON file, and return its URL for a ShareLink. Returns nil on failure.
+    public func exportBackup() async -> URL? {
+        let service = BackupService(
+            library: libraryRepository, sessions: sessionRepository, profiles: repository
+        )
+        guard let document = try? await service.export() else { return nil }
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.prettyPrinted, .withoutEscapingSlashes]
+        encoder.dateEncodingStrategy = .iso8601
+        guard let data = try? encoder.encode(document) else { return nil }
+
+        let stamp = Date().formatted(.iso8601.year().month().day())
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("Markwise-Backup-\(stamp).json")
+        do {
+            try data.write(to: url, options: .atomic)
+            return url
+        } catch {
+            return nil
+        }
+    }
+
+    /// Decode a backup file the user picked and restore it (additive). Returns
+    /// false if the file can't be read or isn't a valid Markwise backup.
+    public func restoreBackup(from url: URL) async -> Bool {
+        let scoped = url.startAccessingSecurityScopedResource()
+        defer { if scoped { url.stopAccessingSecurityScopedResource() } }
+
+        guard let data = try? Data(contentsOf: url) else { return false }
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        guard let document = try? decoder.decode(BackupDocument.self, from: data) else { return false }
+
+        let service = BackupService(
+            library: libraryRepository, sessions: sessionRepository, profiles: repository
+        )
+        do {
+            try await service.restore(document)
+            lastRestoreSummary = "Restored \(document.summaryLine)."
+            await load()        // pick up the restored profile (theme, name, photo)
+            return true
+        } catch {
+            return false
+        }
     }
 
     /// A Markdown report of session history, for the export sheet / ShareLink.
