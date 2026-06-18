@@ -176,6 +176,49 @@ public enum Statistics {
         )
     }
 
+    /// Prompts currently *due for review*, highest priority first — a lightweight
+    /// spaced-repetition signal derived purely from history. A question is due if
+    /// it has ever been missed and hasn't yet been answered correctly
+    /// `masteryStreak` times in a row (after which it's considered learned and
+    /// drops out). Priority favors the ones whose most-recent answer was wrong,
+    /// then by total misses and miss rate. Pure ⇒ deterministic and testable.
+    public static func dueForReview(from records: [SessionRecord], masteryStreak: Int = 2) -> [String] {
+        let chronological = records.sorted { $0.finishedAt < $1.finishedAt }
+
+        var history: [String: [Bool]] = [:]   // prompt → isCorrect, oldest first
+        var firstSeen: [String] = []          // stable order for tie-breaks
+        for record in chronological {
+            for attempt in record.result.attempts {
+                guard let prompt = attempt.prompt, !prompt.isEmpty else { continue }
+                if history[prompt] == nil { firstSeen.append(prompt) }
+                history[prompt, default: []].append(attempt.isCorrect)
+            }
+        }
+
+        struct Scored { let prompt: String; let priority: Double }
+        var due: [Scored] = []
+        for prompt in firstSeen {
+            let outcomes = history[prompt] ?? []
+            let misses = outcomes.filter { !$0 }.count
+            guard misses > 0 else { continue }            // never missed → not weak
+
+            var trailingCorrect = 0
+            for correct in outcomes.reversed() {
+                if correct { trailingCorrect += 1 } else { break }
+            }
+            guard trailingCorrect < masteryStreak else { continue }   // learned → drop
+
+            let lastWasWrong = outcomes.last == false
+            let missRate = Double(misses) / Double(outcomes.count)
+            let priority = (lastWasWrong ? 1000.0 : 0) + Double(misses) * 10 + missRate
+            due.append(Scored(prompt: prompt, priority: priority))
+        }
+
+        return due
+            .sorted { $0.priority != $1.priority ? $0.priority > $1.priority : $0.prompt < $1.prompt }
+            .map(\.prompt)
+    }
+
     static func masteryLevel(correct: Int, total: Int) -> MasteryLevel {
         guard total > 0 else { return .novice }
         let accuracy = Double(correct) / Double(total)

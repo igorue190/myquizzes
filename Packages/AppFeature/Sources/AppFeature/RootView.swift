@@ -41,6 +41,8 @@ enum LaunchOptions {
     static var autostartExam: Bool { screen == "exam" }
     static var showImportReview: Bool { screen == "import" }
     static var showHistory: Bool { screen == "history" }
+    /// Deep-linking into a screen skips the first-run onboarding overlay.
+    static var skipOnboarding: Bool { screen != nil }
 }
 
 public struct RootView: View {
@@ -51,6 +53,10 @@ public struct RootView: View {
     @State private var activeQuiz: QuizSessionViewModel?
     @State private var showImportReview: Bool
     @State private var showHistory: Bool
+    @State private var showWelcomeBack: Bool
+
+    @AppStorage("markwise.hasOnboarded") private var hasOnboarded = false
+    @Environment(\.scenePhase) private var scenePhase
 
     private let libraryRepository: any LibraryRepository
     private let sessionRepository: any SessionRepository
@@ -66,10 +72,14 @@ public struct RootView: View {
         self.sessionRepository = sessionRepo
         _library = State(initialValue: LibraryViewModel(repository: libraryRepo))
         _stats = State(initialValue: StatsViewModel(repository: sessionRepo))
-        _profile = State(initialValue: ProfileViewModel(repository: profileRepo, sessionRepository: sessionRepo))
+        _profile = State(initialValue: ProfileViewModel(repository: profileRepo, sessionRepository: sessionRepo, libraryRepository: libraryRepo))
         _selection = State(initialValue: LaunchOptions.initialTab)
         _showImportReview = State(initialValue: LaunchOptions.showImportReview)
         _showHistory = State(initialValue: LaunchOptions.showHistory)
+        // Greet returning users on a cold launch; first-run users see onboarding
+        // instead, and UITest deep-links skip the greeting.
+        let onboarded = UserDefaults.standard.bool(forKey: "markwise.hasOnboarded")
+        _showWelcomeBack = State(initialValue: onboarded && !LaunchOptions.skipOnboarding)
     }
 
     /// The current theme, derived from the profile — re-tints the whole app when
@@ -84,7 +94,7 @@ public struct RootView: View {
             .tabItem { Label("Library", systemImage: "books.vertical") }
             .tag(AppTab.library)
 
-            PracticeView(sessionRepository: sessionRepository, profile: profile)
+            PracticeView(sessionRepository: sessionRepository, profile: profile, library: library)
                 .tabItem { Label("Practice", systemImage: "play.circle") }
                 .tag(AppTab.practice)
 
@@ -146,7 +156,69 @@ public struct RootView: View {
             }
             .markwiseTheme(theme)
         }
+        .fullScreenCover(isPresented: Binding(
+            get: { !hasOnboarded && !LaunchOptions.skipOnboarding },
+            set: { presented in if !presented { hasOnboarded = true } }
+        )) {
+            OnboardingView { name in
+                if !name.isEmpty {
+                    profile.profile.displayName = name
+                    Task { await profile.persist() }
+                }
+                hasOnboarded = true
+            }
+            .markwiseTheme(theme)
+        }
+        .fullScreenCover(isPresented: $showWelcomeBack) {
+            WelcomeBackView(
+                name: profile.profile.displayName,
+                imageData: profile.profile.avatarImageData,
+                symbol: profile.profile.avatarSymbol
+            ) { showWelcomeBack = false }
+            .markwiseTheme(theme)
+        }
         .task { await seedIfNeeded() }
+        .onChange(of: scenePhase) { _, phase in
+            if phase == .active { Task { await importSharedFiles() } }
+        }
+        .onChange(of: selection) { _, tab in
+            // Refresh the flat file list so newly imported quizzes appear in Practice.
+            if tab == .practice { Task { await library.load() } }
+        }
+    }
+
+    /// Drain any `.md` files the Share extension dropped into the App Group inbox,
+    /// importing each into an "Imported › Shared" topic.
+    private func importSharedFiles() async {
+        let inbox = SharedInbox.shared()
+        let pending = inbox.pendingFiles()
+        guard !pending.isEmpty else { return }
+        do {
+            let topic = try await importedTopic()
+            for file in pending {
+                await library.importMarkdown(title: file.title, markdown: file.markdown, into: topic)
+                inbox.remove(file)
+            }
+            await library.load()
+        } catch {
+            // Non-fatal: files remain in the inbox for the next foreground.
+        }
+    }
+
+    /// Find (or create) the "Imported › Shared" destination for shared files.
+    private func importedTopic() async throws -> Topic {
+        let categories = try await libraryRepository.categories()
+        let category: CoreModels.Category
+        if let existing = categories.first(where: { $0.name == "Imported" }) {
+            category = existing
+        } else {
+            category = try await libraryRepository.createCategory(name: "Imported")
+        }
+        let topics = try await libraryRepository.topics(in: category.id)
+        if let existing = topics.first(where: { $0.name == "Shared" }) {
+            return existing
+        }
+        return try await libraryRepository.createTopic(name: "Shared", in: category.id)
     }
 
     /// Build a quiz view model that uses the profile's defaults and persists its

@@ -48,12 +48,17 @@ public struct TagChip: View {
     }
 
     public var body: some View {
-        Text(text)
-            .font(Typography.caption)
-            .foregroundStyle(foreground)
-            .padding(.horizontal, Spacing.sm)
-            .padding(.vertical, Spacing.xxs)
-            .glassCapsule(role)
+        HStack(spacing: Spacing.xxs) {
+            if let dot = dotColor {
+                Circle().fill(dot).frame(width: 7, height: 7)
+            }
+            Text(text)
+                .font(Typography.caption.weight(.semibold))
+        }
+        .foregroundStyle(foreground)
+        .padding(.horizontal, Spacing.sm)
+        .padding(.vertical, Spacing.xxs)
+        .glassCapsule(role)
     }
 
     private var role: GlassRole {
@@ -64,9 +69,19 @@ public struct TagChip: View {
         }
     }
 
+    /// The label text uses the system label color so it stays legible on the
+    /// translucent tinted capsule (the earlier same-color-as-tint text read as a
+    /// blank color blob). The semantic color is carried by a small leading dot.
     private var foreground: Color {
         switch kind {
-        case .neutral:           .secondary
+        case .neutral:    .secondary
+        case .semantic, .difficulty: .primary
+        }
+    }
+
+    private var dotColor: Color? {
+        switch kind {
+        case .neutral:           nil
         case .semantic(let c):   c
         case .difficulty(let d): d.color
         }
@@ -138,27 +153,43 @@ public struct ChoiceRow: View {
         .buttonStyle(.plain)
         .disabled(!isEnabled)
         .glassSurface(glassRole, cornerRadius: Radius.md, interactive: isInteractive)
+        .overlay {
+            // In review, outline the row in its result color instead of tinting
+            // the whole surface — keeps the answer text and indicators legible.
+            if let reviewColor {
+                RoundedRectangle(cornerRadius: Radius.md, style: .continuous)
+                    .strokeBorder(reviewColor, lineWidth: 2)
+            }
+        }
         .animation(Motion.snappy, value: state)
         .accessibilityElement(children: .combine)
         .accessibilityAddTraits(isSelected ? .isSelected : [])
         .accessibilityHint(accessibilityHint)
     }
 
-    // Leading selection indicator.
+    // Leading selection indicator: a circle for single-choice (a radio), a
+    // rounded square for multiple-choice (a checkbox). Selected = a solid fill
+    // with a high-contrast white glyph, so the chosen answer is unmistakable.
     @ViewBuilder
     private var indicator: some View {
         let isCircle = style == .single
-        let shape = RoundedRectangle(cornerRadius: isCircle ? 11 : 6, style: .continuous)
+        let shape = RoundedRectangle(cornerRadius: isCircle ? 13 : 7, style: .continuous)
         ZStack {
-            shape.fill(isSelected ? indicatorColor.opacity(0.18) : Color.clear)
-            shape.stroke(indicatorColor, lineWidth: 2)
-            if isSelected {
-                Image(systemName: isCircle ? "circle.fill" : "checkmark")
-                    .font(.system(size: isCircle ? 10 : 12, weight: .bold))
-                    .foregroundStyle(indicatorColor)
+            shape.fill(isFilled ? indicatorColor : Color.clear)
+            shape.strokeBorder(indicatorColor, lineWidth: 2)
+            if isFilled {
+                if isCircle {
+                    Circle()
+                        .fill(.white)
+                        .frame(width: 9, height: 9)
+                } else {
+                    Image(systemName: "checkmark")
+                        .font(.system(size: 14, weight: .heavy))
+                        .foregroundStyle(.white)
+                }
             }
         }
-        .frame(width: 22, height: 22)
+        .frame(width: 26, height: 26)
     }
 
     // Trailing result icon (review only).
@@ -181,6 +212,16 @@ public struct ChoiceRow: View {
     private var isSelected: Bool { state == .selected || state == .correct || state == .incorrect }
     private var isInteractive: Bool { isEnabled && (state == .unselected || state == .selected) }
 
+    /// The indicator shows a solid fill (with a white glyph) whenever it's chosen
+    /// *or* being revealed in review — so the correct answer the user missed still
+    /// has a clearly visible, filled radio/checkbox rather than a faint outline.
+    private var isFilled: Bool {
+        switch state {
+        case .unselected:                                false
+        case .selected, .correct, .incorrect, .missedCorrect: true
+        }
+    }
+
     private var indicatorColor: Color {
         switch state {
         case .unselected:               .secondary
@@ -190,12 +231,21 @@ public struct ChoiceRow: View {
         }
     }
 
+    /// Review-only outline color for the whole row (nil while answering, so the
+    /// surface stays neutral and the text/indicator keep full contrast).
+    private var reviewColor: Color? {
+        switch state {
+        case .correct, .missedCorrect: ColorTokens.success
+        case .incorrect:               ColorTokens.danger
+        case .selected, .unselected:   nil
+        }
+    }
+
     private var glassRole: GlassRole {
         switch state {
-        case .unselected:               .regular
-        case .selected:                 .prominent
-        case .correct, .missedCorrect:  .tinted(ColorTokens.success)
-        case .incorrect:                .tinted(ColorTokens.danger)
+        case .unselected:                            .regular
+        case .selected:                              .prominent
+        case .correct, .missedCorrect, .incorrect:   .regular
         }
     }
 

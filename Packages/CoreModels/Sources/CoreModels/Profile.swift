@@ -11,19 +11,21 @@ import Foundation
 /// Which visual identity the app uses. Maps to a DesignSystem `Theme` in the UI
 /// layer (CoreModels stays free of SwiftUI).
 public enum ThemeID: String, Sendable, Codable, CaseIterable, Hashable {
-    case standard, aurora
+    case standard, aurora, violet
 
     public var displayName: String {
         switch self {
         case .standard: "Indigo"
         case .aurora:   "Aurora"
+        case .violet:   "Violet (Light)"
         }
     }
 }
 
 public struct Profile: Sendable, Equatable, Codable, Hashable {
     public var displayName: String
-    public var avatarSymbol: String          // an SF Symbol name
+    public var avatarSymbol: String          // an SF Symbol name (used when no photo)
+    public var avatarImageData: Data?        // a user-supplied photo; nil = use the symbol
     public var themeID: ThemeID
     public var hapticsEnabled: Bool
 
@@ -35,6 +37,7 @@ public struct Profile: Sendable, Equatable, Codable, Hashable {
     public init(
         displayName: String = "Learner",
         avatarSymbol: String = "person.crop.circle.fill",
+        avatarImageData: Data? = nil,
         themeID: ThemeID = .standard,
         hapticsEnabled: Bool = true,
         defaultPassThreshold: Int = 70,
@@ -43,12 +46,16 @@ public struct Profile: Sendable, Equatable, Codable, Hashable {
     ) {
         self.displayName = displayName
         self.avatarSymbol = avatarSymbol
+        self.avatarImageData = avatarImageData
         self.themeID = themeID
         self.hapticsEnabled = hapticsEnabled
         self.defaultPassThreshold = defaultPassThreshold
         self.defaultQuestionCount = defaultQuestionCount
         self.defaultTimeLimit = defaultTimeLimit
     }
+
+    /// True when the user has chosen a photo (vs. the default SF Symbol avatar).
+    public var hasPhoto: Bool { avatarImageData != nil }
 
     public static let `default` = Profile()
 

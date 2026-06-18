@@ -25,7 +25,11 @@ public enum Scorer {
                 selectedChoiceIDs: selected,
                 correctChoiceIDs: correct,
                 isCorrect: isCorrect(selected: selected, correct: correct),
-                prompt: question.prompt
+                prompt: question.prompt,
+                choices: question.choices.map {
+                    AttemptChoice(id: $0.id, text: $0.text, isCorrect: $0.isCorrect)
+                },
+                explanation: question.explanation
             )
         }
 

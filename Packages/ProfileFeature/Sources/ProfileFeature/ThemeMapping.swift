@@ -14,6 +14,7 @@ public extension ThemeID {
         switch self {
         case .standard: .standard
         case .aurora:   .aurora
+        case .violet:   .violet
         }
     }
 }
