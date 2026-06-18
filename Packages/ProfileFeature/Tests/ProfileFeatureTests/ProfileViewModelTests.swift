@@ -15,7 +15,7 @@ struct ProfileViewModelTests {
     @Test("Loads the default profile, persists edits")
     func loadPersist() async {
         let repo = InMemoryProfileRepository()
-        let model = ProfileViewModel(repository: repo, sessionRepository: InMemorySessionRepository())
+        let model = ProfileViewModel(repository: repo, sessionRepository: InMemorySessionRepository(), libraryRepository: InMemoryLibraryRepository())
         await model.load()
         #expect(model.profile == .default)
 
@@ -23,7 +23,7 @@ struct ProfileViewModelTests {
         model.profile.themeID = .aurora
         await model.persist()
 
-        let reloaded = ProfileViewModel(repository: repo, sessionRepository: InMemorySessionRepository())
+        let reloaded = ProfileViewModel(repository: repo, sessionRepository: InMemorySessionRepository(), libraryRepository: InMemoryLibraryRepository())
         await reloaded.load()
         #expect(reloaded.profile.displayName == "Ada")
         #expect(reloaded.profile.themeID == .aurora)
@@ -32,7 +32,8 @@ struct ProfileViewModelTests {
     @Test("theme maps the ThemeID to a DesignSystem Theme")
     func themeMapping() async {
         let model = ProfileViewModel(repository: InMemoryProfileRepository(),
-                                     sessionRepository: InMemorySessionRepository())
+                                     sessionRepository: InMemorySessionRepository(),
+                                     libraryRepository: InMemoryLibraryRepository())
         await model.load()
         #expect(model.theme == Theme.standard)
         model.profile.themeID = .aurora
@@ -49,7 +50,7 @@ struct ProfileViewModelTests {
         )
         try! await session.save(SessionRecord(scopeLabel: "AZ-900", result: result))
 
-        let model = ProfileViewModel(repository: InMemoryProfileRepository(), sessionRepository: session)
+        let model = ProfileViewModel(repository: InMemoryProfileRepository(), sessionRepository: session, libraryRepository: InMemoryLibraryRepository())
         let text = await model.exportHistory()
         #expect(text.contains("Session History"))
         #expect(text.contains("AZ-900"))
