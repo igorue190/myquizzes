@@ -122,6 +122,10 @@ public actor InMemoryLibraryRepository: LibraryRepository {
         filesByID[id]?.title = title
     }
 
+    public func updateSummary(file id: UUID, to summary: ParseSummary) async throws {
+        filesByID[id]?.summary = summary
+    }
+
     // MARK: - Reorder (each id's order becomes its index)
 
     public func reorderTopics(in categoryID: UUID, _ orderedIDs: [UUID]) async throws {

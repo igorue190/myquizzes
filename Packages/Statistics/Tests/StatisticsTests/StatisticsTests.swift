@@ -144,6 +144,81 @@ struct StatisticsTests {
         #expect(missed.contains { $0.prompt == "Q-easy" } == false)   // never missed
     }
 
+    // MARK: - Study habits
+
+    /// A fixed reference "now" and UTC calendar so day math is deterministic.
+    private var fixedNow: Date { Date(timeIntervalSince1970: 1_700_000_000) } // 2023-11-14 22:13 UTC
+    private var utcCalendar: Calendar {
+        var cal = Calendar(identifier: .gregorian)
+        cal.timeZone = TimeZone(identifier: "UTC")!
+        return cal
+    }
+
+    /// A session finished `daysAgo` (relative to `fixedNow`) with `questions` answers.
+    private func dayRecord(daysAgo: Int, questions: Int = 1) -> SessionRecord {
+        let day = utcCalendar.date(byAdding: .day, value: -daysAgo, to: fixedNow)!
+        let attempts = (0..<questions).map {
+            QuestionAttempt(questionID: $0, selectedChoiceIDs: [0], correctChoiceIDs: [0], isCorrect: true)
+        }
+        return SessionRecord(finishedAt: day, result: SessionResult(mode: .training, attempts: attempts, passThreshold: 70))
+    }
+
+    @Test("Empty history yields empty habits")
+    func habitsEmpty() {
+        #expect(Statistics.habits(from: [], calendar: utcCalendar, now: fixedNow) == .empty)
+    }
+
+    @Test("Current streak counts consecutive days back from today")
+    func habitsCurrentStreak() {
+        let records = [dayRecord(daysAgo: 0), dayRecord(daysAgo: 1), dayRecord(daysAgo: 2)]
+        let habits = Statistics.habits(from: records, calendar: utcCalendar, now: fixedNow)
+        #expect(habits.studyStreakDays == 3)
+        #expect(habits.bestStreakDays == 3)
+    }
+
+    @Test("A gap of two or more days lapses the current streak")
+    func habitsLapsedStreak() {
+        // Most recent study was 2 days ago → streak is not live (0), but best stands.
+        let records = [dayRecord(daysAgo: 2), dayRecord(daysAgo: 3)]
+        let habits = Statistics.habits(from: records, calendar: utcCalendar, now: fixedNow)
+        #expect(habits.studyStreakDays == 0)
+        #expect(habits.bestStreakDays == 2)
+    }
+
+    @Test("Studying yesterday keeps the streak live")
+    func habitsYesterdayLive() {
+        let habits = Statistics.habits(from: [dayRecord(daysAgo: 1)], calendar: utcCalendar, now: fixedNow)
+        #expect(habits.studyStreakDays == 1)
+    }
+
+    @Test("Questions answered and sessions-this-week aggregate correctly")
+    func habitsTotals() {
+        let records = [
+            dayRecord(daysAgo: 0, questions: 5),
+            dayRecord(daysAgo: 3, questions: 4),
+            dayRecord(daysAgo: 10, questions: 3)   // outside the 7-day window
+        ]
+        let habits = Statistics.habits(from: records, calendar: utcCalendar, now: fixedNow)
+        #expect(habits.questionsAnswered == 12)
+        #expect(habits.sessionsThisWeek == 2)
+    }
+
+    // MARK: - Rolling average
+
+    @Test("Rolling average smooths a trend, clamped at the start")
+    func rollingAverage() {
+        func point(_ pct: Double) -> TrendPoint {
+            TrendPoint(id: UUID(), date: Date(), percentage: pct, passed: pct >= 70, mode: .training)
+        }
+        let avg = Statistics.rollingAverage([point(0), point(100), point(50)], window: 2)
+        #expect(avg == [0, 50, 75])           // [0], [0,100], [100,50]
+    }
+
+    @Test("Rolling average of an empty trend is empty")
+    func rollingAverageEmpty() {
+        #expect(Statistics.rollingAverage([]).isEmpty)
+    }
+
     @Test("Mastery levels map from accuracy")
     func mastery() {
         #expect(Statistics.masteryLevel(correct: 10, total: 10) == .mastered)

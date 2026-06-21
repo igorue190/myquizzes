@@ -99,17 +99,35 @@ public struct QuizFileRef: Sendable, Equatable, Codable, Hashable, Identifiable 
 
 // MARK: - Parse summary / validation
 
+/// What kind of content a stored file holds, so the Library routes it to the
+/// right screen (the quiz runner vs. the vocabulary study hub) without re-reading
+/// the bytes. New in the vocabulary feature; files saved before it decode as
+/// `.quiz`.
+public enum ContentKind: String, Sendable, Codable, Hashable, CaseIterable {
+    case quiz
+    case vocabulary
+}
+
 /// Cached, displayable result of parsing a file (so the Library can show a
-/// "12 questions · 2 warnings" badge without re-parsing).
+/// "12 questions · 2 warnings" badge without re-parsing). `questionCount` doubles
+/// as the entry count for a vocabulary file.
 public struct ParseSummary: Sendable, Equatable, Codable, Hashable {
     public var questionCount: Int
     public var warningCount: Int
     public var errorCount: Int
+    /// Whether this file is a quiz or a vocabulary set.
+    public var kind: ContentKind
 
-    public init(questionCount: Int = 0, warningCount: Int = 0, errorCount: Int = 0) {
+    public init(
+        questionCount: Int = 0,
+        warningCount: Int = 0,
+        errorCount: Int = 0,
+        kind: ContentKind = .quiz
+    ) {
         self.questionCount = questionCount
         self.warningCount = warningCount
         self.errorCount = errorCount
+        self.kind = kind
     }
 
     /// Derive a summary from a parsed quiz.
@@ -117,6 +135,24 @@ public struct ParseSummary: Sendable, Equatable, Codable, Hashable {
         self.questionCount = quiz.questions.count
         self.warningCount = quiz.diagnostics.filter { $0.severity == .warning }.count
         self.errorCount = quiz.diagnostics.filter { $0.severity == .error }.count
+        self.kind = .quiz
+    }
+
+    /// Derive a summary from a vocabulary set (the entry count fills `questionCount`).
+    public init(_ set: VocabularySet) {
+        self.questionCount = set.entries.count
+        self.warningCount = 0
+        self.errorCount = set.entries.count - set.usableEntries.count
+        self.kind = .vocabulary
+    }
+
+    // Custom decoding so files saved before `kind` existed still load as `.quiz`.
+    public init(from decoder: any Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        questionCount = try c.decode(Int.self, forKey: .questionCount)
+        warningCount = try c.decode(Int.self, forKey: .warningCount)
+        errorCount = try c.decode(Int.self, forKey: .errorCount)
+        kind = try c.decodeIfPresent(ContentKind.self, forKey: .kind) ?? .quiz
     }
 
     public enum Status: String, Sendable, Codable { case ok, warnings, errors }
@@ -174,6 +210,11 @@ public protocol LibraryRepository: Sendable {
     func rename(topic id: UUID, to name: String) async throws
     func rename(folder id: UUID, to name: String) async throws
     func rename(file id: UUID, to title: String) async throws
+
+    /// Replace a file's parse summary (question/word count, status, and content
+    /// kind). Used to heal a stored kind that no longer matches the file's
+    /// markdown — e.g. older files migrated before `kind` was persisted.
+    func updateSummary(file id: UUID, to summary: ParseSummary) async throws
 
     /// Persist a new order for siblings (each id's `order` becomes its index).
     func reorderTopics(in categoryID: UUID, _ orderedIDs: [UUID]) async throws

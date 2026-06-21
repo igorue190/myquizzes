@@ -30,13 +30,27 @@ public final class HistoryViewModel {
 
 public struct HistoryView: View {
     @State private var model: HistoryViewModel
+    private let onExplain: ((ExplanationRequest) async throws -> Explanation)?
+    private let onCached: ((ExplanationRequest) async -> Explanation?)?
 
-    public init(model: HistoryViewModel) {
+    public init(
+        model: HistoryViewModel,
+        onExplain: ((ExplanationRequest) async throws -> Explanation)? = nil,
+        onCached: ((ExplanationRequest) async -> Explanation?)? = nil
+    ) {
         _model = State(initialValue: model)
+        self.onExplain = onExplain
+        self.onCached = onCached
     }
 
-    public init(repository: any SessionRepository) {
+    public init(
+        repository: any SessionRepository,
+        onExplain: ((ExplanationRequest) async throws -> Explanation)? = nil,
+        onCached: ((ExplanationRequest) async -> Explanation?)? = nil
+    ) {
         _model = State(initialValue: HistoryViewModel(repository: repository))
+        self.onExplain = onExplain
+        self.onCached = onCached
     }
 
     public var body: some View {
@@ -52,7 +66,7 @@ public struct HistoryView: View {
                 List {
                     ForEach(model.records) { record in
                         NavigationLink {
-                            SessionSummaryView(record: record)
+                            SessionSummaryView(record: record, onExplain: onExplain, onCached: onCached)
                         } label: {
                             HistoryRow(record: record)
                         }

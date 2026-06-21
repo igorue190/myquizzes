@@ -16,7 +16,8 @@ public enum PersistenceStack {
     public static var schema: Schema {
         Schema([
             CategoryEntity.self, TopicEntity.self, FolderEntity.self, QuizFileEntity.self,
-            SessionRecordEntity.self, ProfileEntity.self
+            SessionRecordEntity.self, ProfileEntity.self, ExplanationCacheEntity.self,
+            VocabReviewEntity.self
         ])
     }
 
@@ -45,6 +46,18 @@ public enum PersistenceStack {
         SwiftDataProfileRepository(modelContainer: container)
     }
 
+    public static func makeExplanationCache(
+        container: ModelContainer
+    ) -> SwiftDataExplanationCache {
+        SwiftDataExplanationCache(modelContainer: container)
+    }
+
+    public static func makeVocabReviewRepository(
+        container: ModelContainer
+    ) -> SwiftDataVocabReviewRepository {
+        SwiftDataVocabReviewRepository(modelContainer: container)
+    }
+
     // MARK: - Convenience (standalone)
 
     /// Build a ready-to-use library repository. `inMemory` + a temporary
@@ -68,6 +81,8 @@ public enum PersistenceStack {
         public let library: SwiftDataLibraryRepository
         public let session: SwiftDataSessionRepository
         public let profile: SwiftDataProfileRepository
+        public let explanationCache: SwiftDataExplanationCache
+        public let vocabReview: SwiftDataVocabReviewRepository
     }
 
     public static func makeAppRepositories(
@@ -79,7 +94,9 @@ public enum PersistenceStack {
         return AppRepositories(
             library: makeLibraryRepository(container: container, fileStore: store),
             session: makeSessionRepository(container: container),
-            profile: makeProfileRepository(container: container)
+            profile: makeProfileRepository(container: container),
+            explanationCache: makeExplanationCache(container: container),
+            vocabReview: makeVocabReviewRepository(container: container)
         )
     }
 }

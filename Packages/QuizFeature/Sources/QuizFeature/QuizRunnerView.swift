@@ -44,6 +44,7 @@ public struct QuizRunnerView: View {
                 if let question = model.current {
                     QuestionCard(
                         prompt: question.prompt,
+                        body: question.body,
                         progressLabel: model.mode == .training ? model.progressLabel : nil,
                         badge: model.badge(for: question)
                     ) {
@@ -147,7 +148,7 @@ struct ResultView: View {
                     }
 
                     ForEach(reviewItems, id: \.question.id) { item in
-                        QuestionCard(prompt: item.question.prompt) {
+                        QuestionCard(prompt: item.question.prompt, body: item.question.body) {
                             ForEach(item.question.choices) { choice in
                                 ChoiceRow(
                                     label: choice.text,
@@ -157,10 +158,12 @@ struct ResultView: View {
                                 ) {}
                             }
                             if let explanation = item.question.explanation {
-                                MarkdownText(explanation)
-                                    .font(Typography.callout)
-                                    .foregroundStyle(.secondary)
+                                RichText(explanation, baseFont: Typography.callout)
                                     .frame(maxWidth: .infinity, alignment: .leading)
+                            }
+                            if model.isAIVisible && !model.isAnswerCorrect(item.question) {
+                                askAIView(for: item.question)
+                                    .task { model.preloadExplanation(for: item.question) }
                             }
                         }
                     }
@@ -169,6 +172,45 @@ struct ResultView: View {
             .padding(Spacing.lg)
         }
         .onAppear { model.openReview() }
+    }
+
+    /// The "Ask AI" CTA and its result for one missed question.
+    @ViewBuilder
+    private func askAIView(for question: Question) -> some View {
+        switch model.explanationPhase(for: question.id) {
+        case .idle:
+            if model.isAIEnabled {
+                Button {
+                    model.requestExplanation(for: question)
+                } label: {
+                    Label("Ask AI", systemImage: "sparkles")
+                }
+                .buttonStyle(.glassSecondary)
+            }
+        case .loading:
+            HStack(spacing: Spacing.sm) {
+                ProgressView()
+                Text("Asking AI…").font(Typography.callout).foregroundStyle(.secondary)
+            }
+        case .loaded(let explanation):
+            VStack(alignment: .leading, spacing: Spacing.sm) {
+                ExplanationCard(explanation: explanation)
+                if model.isAIEnabled {
+                    Button {
+                        model.requestExplanation(for: question)
+                    } label: {
+                        Label("Regenerate", systemImage: "arrow.clockwise")
+                    }
+                    .buttonStyle(.glassSecondary)
+                }
+            }
+        case .failed(let message):
+            VStack(alignment: .leading, spacing: Spacing.xs) {
+                Text(message).font(Typography.callout).foregroundStyle(ColorTokens.danger)
+                Button("Try again") { model.requestExplanation(for: question) }
+                    .buttonStyle(.glassSecondary)
+            }
+        }
     }
 
     private func topicBreakdown(_ scores: [TopicScore]) -> some View {

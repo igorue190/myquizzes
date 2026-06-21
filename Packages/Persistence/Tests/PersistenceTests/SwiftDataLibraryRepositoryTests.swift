@@ -48,6 +48,29 @@ struct SwiftDataLibraryRepositoryTests {
         #expect(try await !repo.isEmpty())
     }
 
+    @Test("ParseSummary.kind survives the round trip so vocab files route correctly")
+    func summaryKindPersists() async throws {
+        let repo = try makeRepo()
+        let category = try await repo.createCategory(name: "Languages")
+        let topic = try await repo.createTopic(name: "Croatian", in: category.id)
+
+        _ = try await repo.importFile(
+            title: "Quiz", markdown: "## Q\n- [x] A\n- [ ] B\n",
+            summary: ParseSummary(questionCount: 1, kind: .quiz),
+            into: topic.id, folder: nil
+        )
+        _ = try await repo.importFile(
+            title: "Vocab", markdown: "---\nkind: vocabulary\n---\n",
+            summary: ParseSummary(questionCount: 5, kind: .vocabulary),
+            into: topic.id, folder: nil
+        )
+
+        let files = try await repo.files(in: topic.id)
+        let byTitle = Dictionary(uniqueKeysWithValues: files.map { ($0.title, $0.summary.kind) })
+        #expect(byTitle["Quiz"] == .quiz)
+        #expect(byTitle["Vocab"] == .vocabulary)
+    }
+
     @Test("Deleting a category cascades to topics, files, and stored bytes")
     func cascadingDelete() async throws {
         let repo = try makeRepo()

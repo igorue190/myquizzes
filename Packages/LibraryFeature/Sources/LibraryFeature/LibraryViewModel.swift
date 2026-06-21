@@ -32,6 +32,9 @@ public final class LibraryViewModel {
     public private(set) var isLoading = false
     public var errorMessage: String?
 
+    /// Guards the one-time content-kind heal so it runs at most once per session.
+    @ObservationIgnored private var didReconcileKinds = false
+
     public init(repository: any LibraryRepository) {
         self.repository = repository
     }
@@ -50,9 +53,41 @@ public final class LibraryViewModel {
             }
             nodes = result
             files = (try? await repository.allFiles()) ?? []
+            await reconcileFileKinds()
         } catch {
             errorMessage = "Couldn't load your library."
         }
+    }
+
+    /// Heal file kinds lost when `kind` was first persisted: files saved before
+    /// that migration were backfilled with a default `.quiz` kind regardless of
+    /// content, so vocabulary sets showed up as quizzes. Re-derive each file's kind
+    /// from its markdown (the authoritative source the openers already trust) and
+    /// correct the stored summary. Runs once per session and only writes when a
+    /// kind actually changed, so it's cheap and idempotent.
+    private func reconcileFileKinds() async {
+        guard !didReconcileKinds else { return }
+        didReconcileKinds = true
+
+        var changed = false
+        for file in files {
+            guard let markdown = try? await repository.markdown(for: file.id) else { continue }
+            let corrected = Self.summary(for: markdown)
+            guard corrected.kind != file.summary.kind else { continue }
+            try? await repository.updateSummary(file: file.id, to: corrected)
+            changed = true
+        }
+        if changed { files = (try? await repository.allFiles()) ?? files }
+    }
+
+    /// The correct parse summary for a markdown file, classifying vocabulary vs
+    /// quiz from its content so the stored `kind` is authoritative. Vocabulary is
+    /// detected first (front matter), since a vocab file isn't a valid quiz.
+    static func summary(for markdown: String) -> ParseSummary {
+        if VocabularyParser.isVocabulary(markdown), let set = VocabularyParser().parse(markdown) {
+            return ParseSummary(set)
+        }
+        return ParseSummary(MarkdownQuizParser().parse(markdown))
     }
 
     public func markdown(for file: QuizFileRef) async -> String? {
@@ -88,7 +123,39 @@ public final class LibraryViewModel {
 
         return pool.enumerated().map { index, q in
             Question(
-                id: index, prompt: q.prompt, type: q.type, choices: q.choices,
+                id: index, prompt: q.prompt, body: q.body, type: q.type, choices: q.choices,
+                explanation: q.explanation, reference: q.reference, tags: q.tags,
+                difficulty: q.difficulty
+            )
+        }
+    }
+
+    /// Reconstruct questions carrying a given topic tag, across every stored file —
+    /// the bridge that lets the Stats screen launch a focused "practice this topic"
+    /// session from a weak-topic row. Matches case-insensitively on `tags`, caps at
+    /// `limit`, de-duplicates by prompt, and renumbers ids into a valid pool.
+    public func questions(forTag tag: String, limit: Int) async -> [Question] {
+        guard limit > 0, !tag.isEmpty else { return [] }
+        let needle = tag.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+
+        var pool: [Question] = []
+        var used = Set<String>()
+        for file in files {
+            guard let markdown = try? await repository.markdown(for: file.id) else { continue }
+            for question in MarkdownQuizParser().parse(markdown).usableQuestions {
+                guard question.tags.contains(where: { $0.lowercased() == needle }) else { continue }
+                let key = question.prompt.trimmingCharacters(in: .whitespacesAndNewlines)
+                guard !used.contains(key) else { continue }
+                used.insert(key)
+                pool.append(question)
+                if pool.count >= limit { break }
+            }
+            if pool.count >= limit { break }
+        }
+
+        return pool.enumerated().map { index, q in
+            Question(
+                id: index, prompt: q.prompt, body: q.body, type: q.type, choices: q.choices,
                 explanation: q.explanation, reference: q.reference, tags: q.tags,
                 difficulty: q.difficulty
             )
@@ -132,9 +199,8 @@ public final class LibraryViewModel {
 
     /// Parse + store at a topic's root (used by the app's first-launch seed).
     public func importMarkdown(title: String, markdown: String, into topic: Topic) async {
-        let quiz = MarkdownQuizParser().parse(markdown)
         try? await repository.importFile(
-            title: title, markdown: markdown, summary: ParseSummary(quiz),
+            title: title, markdown: markdown, summary: Self.summary(for: markdown),
             into: topic.id, folder: nil
         )
     }

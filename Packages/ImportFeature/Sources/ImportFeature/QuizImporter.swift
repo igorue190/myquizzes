@@ -46,7 +46,16 @@ struct QuizImporterModifier: ViewModifier {
                     markdown: payload.markdown,
                     quiz: payload.quiz,
                     onConfirm: { title in
-                        onImport(title, payload.markdown, ParseSummary(payload.quiz))
+                        // Classify by content so a vocabulary file dropped into the
+                        // quiz importer is still stored with the right kind.
+                        let summary: ParseSummary
+                        if VocabularyParser.isVocabulary(payload.markdown),
+                           let set = VocabularyParser().parse(payload.markdown) {
+                            summary = ParseSummary(set)
+                        } else {
+                            summary = ParseSummary(payload.quiz)
+                        }
+                        onImport(title, payload.markdown, summary)
                         review = nil
                     },
                     onCancel: { review = nil }

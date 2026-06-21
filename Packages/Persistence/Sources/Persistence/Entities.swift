@@ -95,6 +95,10 @@ final class QuizFileEntity {
     var questionCount: Int
     var warningCount: Int
     var errorCount: Int
+    /// Whether this file is a quiz or a vocabulary set. Stored as the raw value so
+    /// SwiftData lightweight migration adds the column with a `.quiz` default for
+    /// files saved before the vocabulary feature existed.
+    var kindRaw: String = ContentKind.quiz.rawValue
     var importedAt: Date
     var topic: TopicEntity?
     var folder: FolderEntity?
@@ -114,6 +118,7 @@ final class QuizFileEntity {
         self.questionCount = summary.questionCount
         self.warningCount = summary.warningCount
         self.errorCount = summary.errorCount
+        self.kindRaw = summary.kind.rawValue
         self.importedAt = importedAt
         self.topic = topic
         self.folder = folder
@@ -129,7 +134,8 @@ final class QuizFileEntity {
             summary: ParseSummary(
                 questionCount: questionCount,
                 warningCount: warningCount,
-                errorCount: errorCount
+                errorCount: errorCount,
+                kind: ContentKind(rawValue: kindRaw) ?? .quiz
             ),
             importedAt: importedAt
         )

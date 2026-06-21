@@ -31,6 +31,24 @@ public final class QuizSessionViewModel {
     /// Whether to fire haptic feedback on answer/submit (the Profile setting).
     @ObservationIgnored public var hapticsEnabled: Bool = false
 
+    /// Injected AI-explanation call. nil ⇒ the feature is off and the "Ask AI"
+    /// button stays hidden. The feature package stays free of any AI dependency.
+    @ObservationIgnored public var onExplain: ((ExplanationRequest) async throws -> Explanation)?
+
+    /// Injected local cache lookup. When set, a previously generated explanation is
+    /// shown instantly and offline (the local-first promise) without a network call.
+    /// nil ⇒ no cached display (e.g. the AI feature is disabled).
+    @ObservationIgnored public var onCachedExplanation: ((ExplanationRequest) async -> Explanation?)?
+
+    /// The language explanations should be written in — the learner's native
+    /// language for translation quizzes, so the AI explains in the language they
+    /// understand best rather than the answer's language. nil ⇒ the model uses the
+    /// question's language (ordinary quizzes). Set at the composition root.
+    @ObservationIgnored public var explanationLanguage: String?
+
+    /// Per-question explanation state, keyed by `Question.id`.
+    public private(set) var explanationPhases: [Int: ExplanationPhase] = [:]
+
     /// Seconds left on the exam clock (0 in Training, or when there's no limit).
     public private(set) var remaining: TimeInterval = 0
     @ObservationIgnored private var timerTask: Task<Void, Never>?
@@ -157,6 +175,73 @@ public final class QuizSessionViewModel {
         case (true, false):  return .missedCorrect
         case (false, true):  return .incorrect
         case (false, false): return .unselected
+        }
+    }
+
+    // MARK: - AI explanations
+
+    /// Whether the "Ask AI" CTA (live generation) should appear.
+    public var isAIEnabled: Bool { onExplain != nil }
+
+    /// Whether the AI block should appear at all — true when we can either generate
+    /// or show a cached explanation. Lets cached results show offline even when no
+    /// API key is set (generation off, cache still readable).
+    public var isAIVisible: Bool { onExplain != nil || onCachedExplanation != nil }
+
+    public func explanationPhase(for questionID: Int) -> ExplanationPhase {
+        explanationPhases[questionID] ?? .idle
+    }
+
+    /// Show a cached explanation for this question if one exists and nothing has
+    /// been loaded yet. Cheap and offline; call on appear of each reviewed question.
+    public func preloadExplanation(for question: Question) {
+        guard let onCachedExplanation, explanationPhase(for: question.id) == .idle else { return }
+        let request = Self.explanationRequest(for: question, selection: session.selection(for: question.id), language: explanationLanguage)
+        Task {
+            if explanationPhases[question.id] == nil || explanationPhases[question.id] == .idle,
+               let cached = await onCachedExplanation(request) {
+                explanationPhases[question.id] = .loaded(cached)
+            }
+        }
+    }
+
+    /// True when the user's answer to this question was wrong (drives the CTA).
+    public func isAnswerCorrect(_ question: Question) -> Bool {
+        session.selection(for: question.id) == question.correctChoiceIDs
+    }
+
+    /// Ask the injected service to explain a missed question; result lands in
+    /// `explanationPhases[question.id]`.
+    public func requestExplanation(for question: Question) {
+        guard let onExplain else { return }
+        let request = Self.explanationRequest(for: question, selection: session.selection(for: question.id), language: explanationLanguage)
+        explanationPhases[question.id] = .loading
+        Task {
+            do {
+                explanationPhases[question.id] = .loaded(try await onExplain(request))
+            } catch {
+                explanationPhases[question.id] = .failed(Self.explanationMessage(for: error))
+            }
+        }
+    }
+
+    static func explanationRequest(for question: Question, selection: Set<Int>, language: String? = nil) -> ExplanationRequest {
+        ExplanationRequest(
+            prompt: question.prompt,
+            choices: question.choices.map { AttemptChoice(id: $0.id, text: $0.text, isCorrect: $0.isCorrect) },
+            selectedChoiceIDs: selection,
+            correctChoiceIDs: question.correctChoiceIDs,
+            existingExplanation: question.explanation,
+            explanationLanguage: language
+        )
+    }
+
+    static func explanationMessage(for error: any Error) -> String {
+        switch error as? ExplanationError {
+        case .notConfigured: "AI explanations aren't set up. Add your API key in Profile."
+        case .network:       "Couldn't reach the AI service. Check your connection."
+        case .api(let reason): reason
+        case .decoding, .none: "The AI response couldn't be read. Try again."
         }
     }
 

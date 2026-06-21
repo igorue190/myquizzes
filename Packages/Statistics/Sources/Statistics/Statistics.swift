@@ -76,6 +76,37 @@ public struct MissedQuestion: Sendable, Equatable, Identifiable {
     public var missRate: Double { attempts == 0 ? 0 : Double(misses) / Double(attempts) }
 }
 
+/// Motivational, easy-to-read study-habit signals derived from session dates —
+/// the kind of numbers that make the Stats page feel alive (streaks, totals,
+/// recent activity) rather than abstract. Pure ⇒ deterministic given a calendar.
+public struct StudyHabits: Sendable, Equatable {
+    /// Consecutive days up to (and including) today with at least one session.
+    /// 0 if the user hasn't studied today or yesterday.
+    public let studyStreakDays: Int
+    /// The longest run of consecutive study-days ever recorded.
+    public let bestStreakDays: Int
+    /// Total questions answered across all sessions.
+    public let questionsAnswered: Int
+    /// Sessions finished within the last 7 days (rolling, not calendar week).
+    public let sessionsThisWeek: Int
+
+    public init(
+        studyStreakDays: Int,
+        bestStreakDays: Int,
+        questionsAnswered: Int,
+        sessionsThisWeek: Int
+    ) {
+        self.studyStreakDays = studyStreakDays
+        self.bestStreakDays = bestStreakDays
+        self.questionsAnswered = questionsAnswered
+        self.sessionsThisWeek = sessionsThisWeek
+    }
+
+    public static let empty = StudyHabits(
+        studyStreakDays: 0, bestStreakDays: 0, questionsAnswered: 0, sessionsThisWeek: 0
+    )
+}
+
 /// The full statistics view computed from history.
 public struct StatsOverview: Sendable, Equatable {
     public let sessionCount: Int
@@ -174,6 +205,79 @@ public enum Statistics {
             trend: trend,
             mostMissed: mostMissed
         )
+    }
+
+    /// Study-habit signals from session dates. `now`/`calendar` are injected so
+    /// tests stay deterministic (per the testing rules). The streak counts back
+    /// from today: if the most recent study-day is neither today nor yesterday the
+    /// streak has lapsed and is 0.
+    public static func habits(
+        from records: [SessionRecord],
+        calendar: Calendar = .current,
+        now: Date = Date()
+    ) -> StudyHabits {
+        guard !records.isEmpty else { return .empty }
+
+        let questionsAnswered = records.reduce(0) { $0 + $1.result.totalQuestions }
+
+        let weekAgo = calendar.date(byAdding: .day, value: -7, to: now) ?? now
+        let sessionsThisWeek = records.filter { $0.finishedAt >= weekAgo }.count
+
+        // Distinct study-days, newest first.
+        let days = Set(records.map { calendar.startOfDay(for: $0.finishedAt) })
+            .sorted(by: >)
+
+        // Best streak: longest run of consecutive calendar days, ever.
+        var bestStreak = 0
+        var run = 0
+        var previous: Date?
+        for day in days.sorted() {   // oldest first for a forward scan
+            if let prev = previous,
+               let next = calendar.date(byAdding: .day, value: 1, to: prev),
+               calendar.isDate(next, inSameDayAs: day) {
+                run += 1
+            } else {
+                run = 1
+            }
+            bestStreak = max(bestStreak, run)
+            previous = day
+        }
+
+        // Current streak: walk back from today while days stay consecutive.
+        let today = calendar.startOfDay(for: now)
+        var currentStreak = 0
+        if let mostRecent = days.first {
+            let gap = calendar.dateComponents([.day], from: mostRecent, to: today).day ?? .max
+            if gap <= 1 {   // studied today or yesterday → streak is live
+                var cursor = mostRecent
+                let daySet = Set(days)
+                while daySet.contains(cursor) {
+                    currentStreak += 1
+                    guard let prev = calendar.date(byAdding: .day, value: -1, to: cursor) else { break }
+                    cursor = prev
+                }
+            }
+        }
+
+        return StudyHabits(
+            studyStreakDays: currentStreak,
+            bestStreakDays: bestStreak,
+            questionsAnswered: questionsAnswered,
+            sessionsThisWeek: sessionsThisWeek
+        )
+    }
+
+    /// A trailing moving average of a trend's percentages, one value per point
+    /// (`window` points back, clamped at the start). Smooths the noisy
+    /// per-session line into a readable arc. Empty in ⇒ empty out.
+    public static func rollingAverage(_ trend: [TrendPoint], window: Int = 5) -> [Double] {
+        guard window > 0 else { return trend.map(\.percentage) }
+        let values = trend.map(\.percentage)
+        return values.indices.map { i in
+            let start = max(0, i - window + 1)
+            let slice = values[start...i]
+            return slice.reduce(0, +) / Double(slice.count)
+        }
     }
 
     /// Prompts currently *due for review*, highest priority first — a lightweight
