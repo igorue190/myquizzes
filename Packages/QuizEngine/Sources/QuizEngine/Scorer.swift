@@ -29,7 +29,8 @@ public enum Scorer {
                 choices: question.choices.map {
                     AttemptChoice(id: $0.id, text: $0.text, isCorrect: $0.isCorrect)
                 },
-                explanation: question.explanation
+                explanation: question.explanation,
+                body: question.body
             )
         }
 

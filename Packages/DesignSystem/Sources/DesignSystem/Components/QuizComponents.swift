@@ -266,17 +266,20 @@ public struct ChoiceRow: View {
 /// then a slot for its answer rows.
 public struct QuestionCard<Choices: View>: View {
     private let prompt: String
+    private let bodyMarkdown: String?
     private let progressLabel: String?
     private let badge: TagChip?
     private let choices: Choices
 
     public init(
         prompt: String,
+        body: String? = nil,
         progressLabel: String? = nil,
         badge: TagChip? = nil,
         @ViewBuilder choices: () -> Choices
     ) {
         self.prompt = prompt
+        self.bodyMarkdown = body
         self.progressLabel = progressLabel
         self.badge = badge
         self.choices = choices()
@@ -295,9 +298,13 @@ public struct QuestionCard<Choices: View>: View {
                     badge
                 }
             }
-            MarkdownText(prompt)
-                .font(Typography.title)
+            RichText(prompt, baseFont: Typography.title)
                 .fixedSize(horizontal: false, vertical: true)
+
+            if let bodyMarkdown, !bodyMarkdown.isEmpty {
+                RichText(bodyMarkdown, baseFont: Typography.body)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
 
             VStack(spacing: Spacing.sm) { choices }
         }

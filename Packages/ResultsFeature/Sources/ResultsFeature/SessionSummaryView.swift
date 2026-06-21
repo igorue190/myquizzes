@@ -15,9 +15,19 @@ import DesignSystem
 
 public struct SessionSummaryView: View {
     private let record: SessionRecord
+    private let onExplain: ((ExplanationRequest) async throws -> Explanation)?
+    private let onCached: ((ExplanationRequest) async -> Explanation?)?
 
-    public init(record: SessionRecord) {
+    @State private var ai = ReviewExplanationModel()
+
+    public init(
+        record: SessionRecord,
+        onExplain: ((ExplanationRequest) async throws -> Explanation)? = nil,
+        onCached: ((ExplanationRequest) async -> Explanation?)? = nil
+    ) {
         self.record = record
+        self.onExplain = onExplain
+        self.onCached = onCached
     }
 
     private var result: SessionResult { record.result }
@@ -52,6 +62,14 @@ public struct SessionSummaryView: View {
         .background(AppBackground())
         .navigationTitle(record.scopeLabel ?? "Result")
         .navigationBarTitleDisplayMode(.inline)
+        .onAppear {
+            ai.onExplain = onExplain
+            ai.onCached = onCached
+            // Surface any cached explanations instantly/offline for missed questions.
+            for attempt in reviewableAttempts where !attempt.isCorrect {
+                ai.preload(request(for: attempt), for: attempt.id)
+            }
+        }
     }
 
     private var detailsCard: some View {
@@ -108,6 +126,7 @@ public struct SessionSummaryView: View {
             ForEach(reviewableAttempts) { attempt in
                 QuestionCard(
                     prompt: attempt.prompt ?? "Question",
+                    body: attempt.body,
                     badge: TagChip(
                         attempt.isCorrect ? "Correct" : "Incorrect",
                         kind: .semantic(attempt.isCorrect ? ColorTokens.success : ColorTokens.danger)
@@ -122,14 +141,64 @@ public struct SessionSummaryView: View {
                         ) {}
                     }
                     if let explanation = attempt.explanation, !explanation.isEmpty {
-                        MarkdownText(explanation)
-                            .font(Typography.callout)
-                            .foregroundStyle(.secondary)
+                        RichText(explanation, baseFont: Typography.callout)
                             .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                    if ai.isVisible && !attempt.isCorrect {
+                        askAIView(for: attempt)
                     }
                 }
             }
         }
+    }
+
+    /// The "Ask AI" CTA and its result for one missed question.
+    @ViewBuilder
+    private func askAIView(for attempt: QuestionAttempt) -> some View {
+        switch ai.phase(for: attempt.id) {
+        case .idle:
+            if ai.isEnabled {
+                Button {
+                    ai.request(request(for: attempt), for: attempt.id)
+                } label: {
+                    Label("Ask AI", systemImage: "sparkles")
+                }
+                .buttonStyle(.glassSecondary)
+            }
+        case .loading:
+            HStack(spacing: Spacing.sm) {
+                ProgressView()
+                Text("Asking AI…").font(Typography.callout).foregroundStyle(.secondary)
+            }
+        case .loaded(let explanation):
+            VStack(alignment: .leading, spacing: Spacing.sm) {
+                ExplanationCard(explanation: explanation)
+                if ai.isEnabled {
+                    Button {
+                        ai.request(request(for: attempt), for: attempt.id)
+                    } label: {
+                        Label("Regenerate", systemImage: "arrow.clockwise")
+                    }
+                    .buttonStyle(.glassSecondary)
+                }
+            }
+        case .failed(let message):
+            VStack(alignment: .leading, spacing: Spacing.xs) {
+                Text(message).font(Typography.callout).foregroundStyle(ColorTokens.danger)
+                Button("Try again") { ai.request(request(for: attempt), for: attempt.id) }
+                    .buttonStyle(.glassSecondary)
+            }
+        }
+    }
+
+    private func request(for attempt: QuestionAttempt) -> ExplanationRequest {
+        ExplanationRequest(
+            prompt: attempt.prompt ?? "",
+            choices: attempt.choices,
+            selectedChoiceIDs: attempt.selectedChoiceIDs,
+            correctChoiceIDs: attempt.correctChoiceIDs,
+            existingExplanation: attempt.explanation
+        )
     }
 
     private func style(for attempt: QuestionAttempt) -> ChoiceSelectionStyle {

@@ -18,20 +18,33 @@ public final class ProfileViewModel {
     private let repository: any ProfileRepository
     private let sessionRepository: any SessionRepository
     private let libraryRepository: any LibraryRepository
+    private let apiKeyStore: any APIKeyStore
+    /// Local cache of AI explanations; nil in previews/tests. Lets the Data screen
+    /// offer a "clear cache" action.
+    private let explanationCache: (any ExplanationCache)?
 
     public var profile: Profile = .default
 
     /// A short summary of the most recent successful restore, for the result alert.
     public private(set) var lastRestoreSummary: String?
 
+    /// Whether an Anthropic API key is stored (drives the settings UI). Kept in
+    /// sync via `setAPIKey`/`clearAPIKey`; the secret itself is never held here.
+    public private(set) var aiKeyPresent: Bool = false
+
     public init(
         repository: any ProfileRepository,
         sessionRepository: any SessionRepository,
-        libraryRepository: any LibraryRepository
+        libraryRepository: any LibraryRepository,
+        apiKeyStore: any APIKeyStore = InMemoryAPIKeyStore(),
+        explanationCache: (any ExplanationCache)? = nil
     ) {
         self.repository = repository
         self.sessionRepository = sessionRepository
         self.libraryRepository = libraryRepository
+        self.apiKeyStore = apiKeyStore
+        self.explanationCache = explanationCache
+        self.aiKeyPresent = apiKeyStore.hasKey
     }
 
     /// The DesignSystem theme for the current profile (so the app can re-tint).
@@ -45,8 +58,35 @@ public final class ProfileViewModel {
         try? await repository.save(profile)
     }
 
+    // MARK: - AI explanations setting
+
+    /// Toggle the opt-in AI feature and persist. Turning it on without a key is
+    /// allowed (the UI then prompts for one); the CTA stays hidden until a key
+    /// exists in the app's runner/results screens.
+    public func setAIExplanationsEnabled(_ enabled: Bool) async {
+        profile.aiExplanationsEnabled = enabled
+        await persist()
+    }
+
+    /// Store the user's Anthropic API key in the Keychain and refresh presence.
+    public func setAPIKey(_ key: String) {
+        apiKeyStore.setKey(key)
+        aiKeyPresent = apiKeyStore.hasKey
+    }
+
+    /// Remove the stored key.
+    public func clearAPIKey() {
+        apiKeyStore.clearKey()
+        aiKeyPresent = apiKeyStore.hasKey
+    }
+
     public func clearHistory() async {
         try? await sessionRepository.deleteAll()
+    }
+
+    /// Remove all cached AI explanations (they regenerate on demand).
+    public func clearExplanationCache() async {
+        await explanationCache?.clear()
     }
 
     /// Store a user-picked photo as the avatar (downscaled so the persisted

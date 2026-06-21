@@ -58,8 +58,14 @@ public struct MarkdownQuizParser: Sendable {
                 if let tags = directive.tags { current?.tags = tags }
 
             case let list as UnorderedList where current != nil:
-                for case let item as ListItem in list.children where item.checkbox != nil {
-                    current?.choices.append((text: item.answerText, isCorrect: item.isChecked))
+                let checkboxItems = list.children.compactMap { $0 as? ListItem }.filter { $0.checkbox != nil }
+                if checkboxItems.isEmpty {
+                    // A plain bullet list in the question body, not the answers.
+                    current?.bodyBlocks.append(list.format())
+                } else {
+                    for item in checkboxItems {
+                        current?.choices.append((text: item.answerText, isCorrect: item.isChecked))
+                    }
                 }
 
             case let quote as BlockQuote where current != nil:
@@ -68,7 +74,9 @@ public struct MarkdownQuizParser: Sendable {
                 current?.reference = reference
 
             default:
-                break
+                // Any other block inside a question (code block, table, paragraph,
+                // image, numbered list, math) is rich body content under the prompt.
+                if current != nil { current?.bodyBlocks.append(block.format()) }
             }
         }
         flush()
@@ -107,6 +115,7 @@ public struct MarkdownQuizParser: Sendable {
         let question = Question(
             id: index,
             prompt: builder.prompt,
+            body: builder.body,
             type: resolvedType,
             choices: choices,
             explanation: builder.explanation,
@@ -169,8 +178,16 @@ private struct QuestionBuilder {
     var choices: [(text: String, isCorrect: Bool)] = []
     var explanation: String?
     var reference: String?
+    /// Rich Markdown blocks between the prompt heading and the answers.
+    var bodyBlocks: [String] = []
 
     init(prompt: String) { self.prompt = prompt }
+
+    /// The captured body as one Markdown string, or nil if there was none.
+    var body: String? {
+        let joined = bodyBlocks.joined(separator: "\n\n").trimmingCharacters(in: .whitespacesAndNewlines)
+        return joined.isEmpty ? nil : joined
+    }
 }
 
 /// Auto-incrementing diagnostic ids so they're stable and Identifiable.

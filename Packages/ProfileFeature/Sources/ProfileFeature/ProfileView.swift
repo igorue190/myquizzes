@@ -2,28 +2,22 @@
 //  ProfileView.swift
 //  ProfileFeature
 //
-//  The settings form: identity, appearance (theme), default exam settings,
-//  haptics, and data management. Edits persist automatically (on change).
+//  The settings form: identity, appearance (theme), and default exam settings,
+//  plus links into three focused sub-screens — "Features", "AI features", and
+//  "Data & backup" (see FeaturesSettingsView / AISettingsView / DataSettingsView).
+//  Edits persist automatically (on change of the observed profile).
 //
 
 import SwiftUI
 import PhotosUI
 import UIKit
-import UniformTypeIdentifiers
 import CoreModels
 import DesignSystem
 
 public struct ProfileView: View {
     @Bindable private var model: ProfileViewModel
 
-    @State private var showDeleteConfirm = false
-    @State private var exportItem: ExportItem?
     @State private var photoItem: PhotosPickerItem?
-    @State private var showPrompt = false
-    @State private var backupShare: BackupShare?
-    @State private var showRestorePicker = false
-    @State private var restoreResult: RestoreResult?
-    @State private var isWorking = false
 
     public init(model: ProfileViewModel) {
         self.model = model
@@ -35,10 +29,7 @@ public struct ProfileView: View {
                 identitySection
                 appearanceSection
                 examDefaultsSection
-                feedbackSection
-                createSection
-                backupSection
-                dataSection
+                managementSection
             }
             .scrollContentBackground(.hidden)
             .background(AppBackground())
@@ -53,46 +44,6 @@ public struct ProfileView: View {
                     model.setPhoto(data)
                 }
                 photoItem = nil
-            }
-        }
-        .alert("Delete all history?", isPresented: $showDeleteConfirm) {
-            Button("Delete", role: .destructive) { Task { await model.clearHistory() } }
-            Button("Cancel", role: .cancel) {}
-        } message: {
-            Text("This removes every saved session result. It can't be undone.")
-        }
-        .sheet(item: $exportItem) { item in
-            exportSheet(item.text)
-        }
-        .sheet(isPresented: $showPrompt) {
-            promptSheet
-        }
-        .sheet(item: $backupShare) { share in
-            backupShareSheet(share.url)
-        }
-        .fileImporter(
-            isPresented: $showRestorePicker,
-            allowedContentTypes: [.json],
-            allowsMultipleSelection: false
-        ) { result in
-            guard case let .success(urls) = result, let url = urls.first else { return }
-            isWorking = true
-            Task {
-                let ok = await model.restoreBackup(from: url)
-                isWorking = false
-                restoreResult = ok ? .success(model.lastRestoreSummary) : .failure
-            }
-        }
-        .alert(item: $restoreResult) { result in
-            switch result {
-            case .success(let summary):
-                Alert(title: Text("Restore complete"),
-                      message: Text(summary ?? "Your backup was restored."),
-                      dismissButton: .default(Text("OK")))
-            case .failure:
-                Alert(title: Text("Couldn't restore"),
-                      message: Text("That file isn't a valid Markwise backup."),
-                      dismissButton: .default(Text("OK")))
             }
         }
     }
@@ -179,153 +130,23 @@ public struct ProfileView: View {
         }
     }
 
-    private var feedbackSection: some View {
-        Section("Feedback") {
-            Toggle("Haptics", isOn: $model.profile.hapticsEnabled)
-        }
-    }
-
-    private var createSection: some View {
-        Section {
-            Button { showPrompt = true } label: {
-                Label("AI quiz-creation prompt", systemImage: "sparkles")
-            }
-        } header: {
-            Text("Create quizzes")
-        } footer: {
-            Text("Paste this prompt into any AI assistant with your study material to generate a quiz file you can import.")
-        }
-    }
-
-    private var backupSection: some View {
-        Section {
-            Button {
-                isWorking = true
-                Task {
-                    let url = await model.exportBackup()
-                    isWorking = false
-                    if let url { backupShare = BackupShare(url: url) }
-                }
+    /// Links into the three focused sub-settings screens.
+    private var managementSection: some View {
+        Section("Settings") {
+            NavigationLink {
+                FeaturesSettingsView(model: model)
             } label: {
-                HStack {
-                    Label("Back up all data", systemImage: "arrow.up.doc")
-                    if isWorking { Spacer(); ProgressView() }
-                }
+                Label("Features", systemImage: "switch.2")
             }
-            .disabled(isWorking)
-
-            Button {
-                showRestorePicker = true
+            NavigationLink {
+                AISettingsView(model: model)
             } label: {
-                Label("Restore from backup", systemImage: "arrow.down.doc")
+                Label("AI features", systemImage: "sparkles")
             }
-            .disabled(isWorking)
-        } header: {
-            Text("Backup")
-        } footer: {
-            Text("Saves your quizzes, history, and profile to one file you can store in Files or iCloud Drive and re-import on a new device. Restoring adds the backup's content; it won't erase what's already here.")
-        }
-    }
-
-    private var dataSection: some View {
-        Section {
-            Button {
-                Task { exportItem = ExportItem(text: await model.exportHistory()) }
+            NavigationLink {
+                DataSettingsView(model: model)
             } label: {
-                Label("Export history", systemImage: "square.and.arrow.up")
-            }
-            Button(role: .destructive) {
-                showDeleteConfirm = true
-            } label: {
-                Label("Delete all history", systemImage: "trash")
-                    .foregroundStyle(ColorTokens.danger)
-            }
-        } header: {
-            Text("Data")
-        } footer: {
-            Text("Everything stays on this device — no account, no network.")
-        }
-    }
-
-    // MARK: - Quiz-creation prompt sheet
-
-    private var promptSheet: some View {
-        NavigationStack {
-            ScrollView {
-                Text(QuizPromptTemplate.text)
-                    .font(Typography.mono)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .textSelection(.enabled)
-                    .padding(Spacing.lg)
-            }
-            .navigationTitle("Quiz prompt")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Done") { showPrompt = false }
-                }
-                ToolbarItemGroup(placement: .primaryAction) {
-                    Button {
-                        UIPasteboard.general.string = QuizPromptTemplate.text
-                    } label: {
-                        Label("Copy", systemImage: "doc.on.doc")
-                    }
-                    ShareLink(item: QuizPromptTemplate.text)
-                }
-            }
-        }
-    }
-
-    // MARK: - Backup share sheet
-
-    private func backupShareSheet(_ url: URL) -> some View {
-        NavigationStack {
-            VStack(spacing: Spacing.lg) {
-                Image(systemName: "checkmark.seal.fill")
-                    .font(.system(size: 56))
-                    .foregroundStyle(ColorTokens.success)
-                Text("Backup ready")
-                    .font(Typography.title)
-                Text("Save it to Files or iCloud Drive, or send it to yourself. Keep it safe — it contains all your quizzes and history.")
-                    .font(Typography.callout)
-                    .foregroundStyle(.secondary)
-                    .multilineTextAlignment(.center)
-                ShareLink(item: url) {
-                    Label("Share / Save backup", systemImage: "square.and.arrow.up")
-                }
-                .buttonStyle(.glassPrimary)
-            }
-            .padding(Spacing.xl)
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .background(AppBackground())
-            .navigationTitle("Backup")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Done") { backupShare = nil }
-                }
-            }
-        }
-    }
-
-    // MARK: - Export sheet
-
-    private func exportSheet(_ text: String) -> some View {
-        NavigationStack {
-            ScrollView {
-                Text(text)
-                    .font(Typography.mono)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .textSelection(.enabled)
-                    .padding(Spacing.lg)
-            }
-            .navigationTitle("Export")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .confirmationAction) { ShareLink(item: text) }
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Done") { exportItem = nil }
-                }
+                Label("Data & backup", systemImage: "externaldrive")
             }
         }
     }
@@ -347,31 +168,10 @@ public struct ProfileView: View {
     }
 }
 
-private struct ExportItem: Identifiable {
-    let id = UUID()
-    let text: String
-}
-
-private struct BackupShare: Identifiable {
-    let id = UUID()
-    let url: URL
-}
-
-private enum RestoreResult: Identifiable {
-    case success(String?)
-    case failure
-    var id: String {
-        switch self {
-        case .success: "success"
-        case .failure: "failure"
-        }
-    }
-}
-
 /// The copy-paste prompt that teaches another AI assistant to emit a quiz file in
 /// exactly the Markdown shape the importer accepts. Kept in sync with the parser
 /// (front matter keys, `##` prompts, `- [x]` task lists, type/tags comments,
-/// explanation/reference blockquotes).
+/// explanation/reference blockquotes). Used by AISettingsView.
 enum QuizPromptTemplate {
     static let text = """
     You are a quiz-authoring assistant. Produce a single Markdown (.md) file of \
@@ -450,6 +250,72 @@ enum QuizPromptTemplate {
     - [ ] Capacity is fixed at provisioning time
 
     > **Explanation:** Elasticity means automatic scale-out/in with usage billing.
+    ---------------------------------------------------------
+    Now generate the full .md file for the SOURCE MATERIAL above.
+    """
+}
+
+/// The copy-paste prompt that teaches another AI assistant to emit a *vocabulary*
+/// file in exactly the Markdown shape the importer accepts. Kept in sync with
+/// `VocabularyParser` (front matter `kind: vocabulary` + the Term/Translation
+/// table). Used by AISettingsView; the app builds flashcards and quizzes from the
+/// imported set.
+enum VocabularyPromptTemplate {
+    static let text = """
+    You are a vocabulary assistant. Produce a single Markdown (.md) file of \
+    bilingual word/phrase pairs in the EXACT format below. It will be imported by \
+    an iOS app called Markwise, which turns it into flashcards and translation \
+    quizzes; if you deviate from the format, rows are dropped.
+
+    ===================  SOURCE MATERIAL  ===================
+    Foreign language (the word being learned): <<< e.g. Croatian (hr) >>>
+    Native language (your translation):        <<< e.g. English (en) >>>
+
+    Extract the vocabulary from this material / topic:
+
+    <<< PASTE YOUR WORD LIST, NOTES, OR TOPIC HERE >>>
+    =========================================================
+
+    -----------------------  FORMAT  ------------------------
+    1. REQUIRED front matter at the very top, fenced by `---` lines:
+         kind: vocabulary            (must be exactly this)
+         title:   string             (e.g. "Croatian — Travel Basics")
+         foreign: Name (code)        (the `Term` language, e.g. "Croatian (hr)")
+         native:  Name (code)        (the `Translation` language, e.g. "English (en)")
+
+    2. THEN a Markdown table with this exact header:
+         | Term | Translation | Pronunciation | Transcription | Example |
+         |------|-------------|---------------|---------------|---------|
+       One row per pair:
+         - Term:          the foreign word/phrase being learned.
+         - Translation:   its meaning in the native language.
+         - Pronunciation: optional Latin/IPA-style hint (leave blank if unsure).
+         - Transcription: optional spelling of the foreign term in the NATIVE
+                          language's own script (e.g. "хвала"); blank when the
+                          native language already uses the Latin alphabet.
+         - Example:       optional short sentence in the foreign language.
+
+    3. HARD REQUIREMENTS (a row is discarded if broken):
+       - Every row needs a non-empty Term AND Translation.
+       - Keep multi-word phrases intact; one pair per row.
+       - Do NOT invent words the source doesn't contain. No duplicates.
+       - If a cell contains a `|`, escape it as `\\|`.
+
+    4. OUTPUT: only the Markdown file content — no commentary before or after.
+
+    -------------------  EXAMPLE  ---------------------------
+    ---
+    kind: vocabulary
+    title: Croatian — Travel Basics
+    foreign: Croatian (hr)
+    native: English (en)
+    ---
+
+    | Term | Translation | Pronunciation | Transcription | Example |
+    |------|-------------|---------------|---------------|---------|
+    | dobar dan | good day | DOH-bar dahn | добар дан | Dobar dan, kako ste? |
+    | hvala | thank you | HVAH-lah | хвала | Hvala lijepa! |
+    | molim | please | MOH-leem | молим |  |
     ---------------------------------------------------------
     Now generate the full .md file for the SOURCE MATERIAL above.
     """

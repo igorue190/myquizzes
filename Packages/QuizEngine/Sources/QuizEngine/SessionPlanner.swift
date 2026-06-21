@@ -63,6 +63,7 @@ extension Question {
         Question(
             id: id,
             prompt: prompt,
+            body: body,
             type: type,
             choices: choices,
             explanation: explanation,

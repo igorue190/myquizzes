@@ -73,6 +73,29 @@ public enum ColorTokens {
         )
     }
 
+    /// A playful, light/dark-adaptive palette for tile accents (e.g. the Library
+    /// topic tiles). Each entry is a two-color gradient pair. Computed (not stored)
+    /// to stay concurrency-safe, mirroring `brandGradient`.
+    static var tilePalette: [[Color]] {
+        [
+            [Color(light: 0x4F46E5, dark: 0x7C7BFF), Color(light: 0x9333EA, dark: 0xC084FC)], // indigo → violet
+            [Color(light: 0x0EA5E9, dark: 0x38BDF8), Color(light: 0x2563EB, dark: 0x60A5FA)], // sky → blue
+            [Color(light: 0x059669, dark: 0x34D399), Color(light: 0x0D9488, dark: 0x2DD4BF)], // emerald → teal
+            [Color(light: 0xF59E0B, dark: 0xFBBF24), Color(light: 0xEA580C, dark: 0xFB923C)], // amber → orange
+            [Color(light: 0xE11D48, dark: 0xFB7185), Color(light: 0xDB2777, dark: 0xF472B6)], // rose → pink
+            [Color(light: 0x7C3AED, dark: 0xA78BFA), Color(light: 0x4338CA, dark: 0x818CF8)]  // violet → indigo
+        ]
+    }
+
+    /// A stable, vivid gradient for a tile, chosen by `seed` so a given item keeps
+    /// its color across launches. Use a deterministic seed (not `UUID.hashValue`,
+    /// which is randomized per process).
+    public static func tileGradient(seed: Int) -> LinearGradient {
+        let palette = tilePalette
+        let pair = palette[abs(seed) % palette.count]
+        return LinearGradient(colors: pair, startPoint: .topLeading, endPoint: .bottomTrailing)
+    }
+
     // Semantic state colors — used *only* when they carry meaning. Tuned so the
     // light values clear WCAG AA (≥4.5:1) as text on the light surface and the
     // dark values do the same on the dark surface, while toning down the neon

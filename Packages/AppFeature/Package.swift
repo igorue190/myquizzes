@@ -20,13 +20,16 @@ let package = Package(
         .package(path: "../StatsFeature"),
         .package(path: "../ResultsFeature"),
         .package(path: "../ProfileFeature"),
+        .package(path: "../VocabularyFeature"),
+        .package(path: "../MarkdownParser"),
         .package(path: "../Statistics"),
-        .package(path: "../Persistence")
+        .package(path: "../Persistence"),
+        .package(path: "../AIExplanation")
     ],
     targets: [
         .target(
             name: "AppFeature",
-            dependencies: ["CoreModels", "DesignSystem", "QuizFeature", "LibraryFeature", "ImportFeature", "StatsFeature", "ResultsFeature", "ProfileFeature", "Statistics", "Persistence"],
+            dependencies: ["CoreModels", "DesignSystem", "QuizFeature", "LibraryFeature", "ImportFeature", "StatsFeature", "ResultsFeature", "ProfileFeature", "VocabularyFeature", "MarkdownParser", "Statistics", "Persistence", "AIExplanation"],
             swiftSettings: [.swiftLanguageMode(.v6)]
         )
     ]

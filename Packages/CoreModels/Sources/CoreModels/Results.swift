@@ -38,6 +38,8 @@ public struct QuestionAttempt: Sendable, Equatable, Codable, Hashable, Identifia
     public let choices: [AttemptChoice]
     /// The question's explanation, shown in the History review. nil if none.
     public let explanation: String?
+    /// The question's rich body (code/tables/math), shown in the History review.
+    public let body: String?
 
     public init(
         questionID: Int,
@@ -47,7 +49,8 @@ public struct QuestionAttempt: Sendable, Equatable, Codable, Hashable, Identifia
         timeSpent: TimeInterval = 0,
         prompt: String? = nil,
         choices: [AttemptChoice] = [],
-        explanation: String? = nil
+        explanation: String? = nil,
+        body: String? = nil
     ) {
         self.questionID = questionID
         self.selectedChoiceIDs = selectedChoiceIDs
@@ -57,6 +60,7 @@ public struct QuestionAttempt: Sendable, Equatable, Codable, Hashable, Identifia
         self.prompt = prompt
         self.choices = choices
         self.explanation = explanation
+        self.body = body
     }
 
     // Custom decoding so records saved before `choices`/`explanation` existed
@@ -72,6 +76,7 @@ public struct QuestionAttempt: Sendable, Equatable, Codable, Hashable, Identifia
         prompt = try c.decodeIfPresent(String.self, forKey: .prompt)
         choices = try c.decodeIfPresent([AttemptChoice].self, forKey: .choices) ?? []
         explanation = try c.decodeIfPresent(String.self, forKey: .explanation)
+        body = try c.decodeIfPresent(String.self, forKey: .body)
     }
 }
 

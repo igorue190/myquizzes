@@ -64,6 +64,28 @@ struct LibraryRepositoryTests {
         #expect(try await !repo.isEmpty())
     }
 
+    @Test("updateSummary replaces a file's counts and content kind")
+    func updateSummaryHealsKind() async throws {
+        let repo = InMemoryLibraryRepository()
+        let cat = try await repo.createCategory(name: "C")
+        let topic = try await repo.createTopic(name: "T", in: cat.id)
+        // A vocab file mistakenly stored as a quiz (the migration-backfill case).
+        let file = try await repo.importFile(
+            title: "Croatian",
+            markdown: "---\nkind: vocabulary\n---\n",
+            summary: ParseSummary(questionCount: 50, kind: .quiz),
+            into: topic.id,
+            folder: nil
+        )
+        #expect(file.summary.kind == .quiz)
+
+        try await repo.updateSummary(file: file.id, to: ParseSummary(questionCount: 50, kind: .vocabulary))
+
+        let healed = try await repo.files(in: topic.id).first
+        #expect(healed?.summary.kind == .vocabulary)
+        #expect(healed?.summary.questionCount == 50)
+    }
+
     @Test("Deleting a category cascades to its topics and files")
     func cascadingDelete() async throws {
         let repo = InMemoryLibraryRepository()

@@ -57,6 +57,35 @@ struct LibraryViewModelTests {
         #expect(model.isEmpty())
     }
 
+    @Test("questions(forTag:) collects tagged questions across files, renumbered")
+    func questionsForTag() async {
+        let model = LibraryViewModel(repository: InMemoryLibraryRepository())
+        await model.addCategory(name: "C")
+        await model.addTopic(name: "T", to: model.nodes[0].category)
+        let topic = model.nodes[0].topics[0]
+
+        let markdown = """
+        ## Networking question
+        <!-- tags: networking -->
+        - [x] A
+        - [ ] B
+
+        ## Security question
+        <!-- tags: security -->
+        - [x] A
+        - [ ] B
+        """
+        await model.importMarkdown(title: "Quiz", markdown: markdown, into: topic)
+        await model.load()
+
+        let net = await model.questions(forTag: "Networking", limit: 10)   // case-insensitive
+        #expect(net.map(\.prompt) == ["Networking question"])
+        #expect(net.first?.id == 0)   // renumbered into a valid pool
+
+        let none = await model.questions(forTag: "missing", limit: 10)
+        #expect(none.isEmpty)
+    }
+
     @Test("folders nest and scope files")
     func folders() async {
         let model = LibraryViewModel(repository: InMemoryLibraryRepository())

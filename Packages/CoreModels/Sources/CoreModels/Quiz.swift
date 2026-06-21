@@ -50,6 +50,10 @@ public struct Choice: Sendable, Equatable, Codable, Hashable, Identifiable {
 public struct Question: Sendable, Equatable, Codable, Hashable, Identifiable {
     public let id: Int
     public let prompt: String
+    /// Optional rich body shown under the prompt: any Markdown blocks (code,
+    /// tables, lists, images, math) that appear between the question heading and
+    /// its answer choices. nil when the question is a plain prompt.
+    public let body: String?
     public let type: QuestionType
     public let choices: [Choice]
     public let explanation: String?
@@ -60,6 +64,7 @@ public struct Question: Sendable, Equatable, Codable, Hashable, Identifiable {
     public init(
         id: Int,
         prompt: String,
+        body: String? = nil,
         type: QuestionType,
         choices: [Choice],
         explanation: String? = nil,
@@ -69,6 +74,7 @@ public struct Question: Sendable, Equatable, Codable, Hashable, Identifiable {
     ) {
         self.id = id
         self.prompt = prompt
+        self.body = body
         self.type = type
         self.choices = choices
         self.explanation = explanation

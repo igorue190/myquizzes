@@ -16,6 +16,44 @@ struct MarkdownQuizParserTests {
 
     let parser = MarkdownQuizParser()
 
+    // MARK: Rich question body
+
+    @Test("blocks between the prompt and the answers are captured as the question body")
+    func capturesBody() {
+        let md = """
+        ## What does this code print?
+
+        ```swift
+        print(2 + 2)
+        ```
+
+        | In | Out |
+        |----|-----|
+        | 4  | 4   |
+
+        - [x] 4
+        - [ ] 22
+        """
+        let quiz = parser.parse(md)
+        let question = quiz.questions[0]
+        let body = question.body ?? ""
+        #expect(body.contains("print(2 + 2)"))
+        #expect(body.contains("| In | Out |") || body.contains("In"))
+        // The answers are still parsed (not swallowed into the body).
+        #expect(question.choices.count == 2)
+        #expect(question.correctChoiceIDs == [0])
+    }
+
+    @Test("a plain question has no body")
+    func plainQuestionHasNoBody() {
+        let md = """
+        ## Pick one
+        - [x] A
+        - [ ] B
+        """
+        #expect(parser.parse(md).questions[0].body == nil)
+    }
+
     // MARK: Front matter
 
     @Test("YAML front matter populates metadata and is stripped from the body")

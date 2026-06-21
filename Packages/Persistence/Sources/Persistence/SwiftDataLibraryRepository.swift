@@ -154,6 +154,15 @@ public actor SwiftDataLibraryRepository: ModelActor, LibraryRepository {
         try modelContext.save()
     }
 
+    public func updateSummary(file id: UUID, to summary: ParseSummary) throws {
+        guard let entity = try fetchFile(id) else { return }
+        entity.questionCount = summary.questionCount
+        entity.warningCount = summary.warningCount
+        entity.errorCount = summary.errorCount
+        entity.kindRaw = summary.kind.rawValue
+        try modelContext.save()
+    }
+
     // MARK: - Reorder
 
     public func reorderTopics(in categoryID: UUID, _ orderedIDs: [UUID]) throws {
